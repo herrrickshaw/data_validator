@@ -1,5 +1,7 @@
 # data_validator
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/herrrickshaw/data_validator/blob/main/notebooks/colab_test.ipynb)
+
 Rescued 2026-07-17 from a stray `working-files` dumping-ground repo (subfolder
 `python_files/`), where this was the only surviving copy. Populated into this
 repo because it already existed under this name, empty.
