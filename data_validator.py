@@ -123,6 +123,7 @@ class DataValidator:
         self.report = None
         self._loaded_data = {}  # Cache loaded DataFrames
         self.cross_source_errors: List[Dict[str, Any]] = []  # comparisons that raised
+        self.kaggle_candidates: List[DataSourceMetadata] = []  # hardcoded, not inventoried
 
     def run_full_validation(self) -> ValidationReport:
         """Run complete validation pipeline."""
@@ -168,9 +169,12 @@ class DataValidator:
         print("  • Scanning CSV files...")
         sources.extend(self._scan_csv_files())
 
-        # Phase 1c: Kaggle metadata (if available)
-        print("  • Checking Kaggle datasets...")
-        sources.extend(self._scan_kaggle_datasets())
+        # Phase 1c: Kaggle. No Kaggle API call is made: _scan_kaggle_datasets() returns a
+        # hardcoded list of candidate dataset names. They are kept apart from the inventory
+        # so they do not count as sources (each would otherwise score quality 0).
+        self.kaggle_candidates = self._scan_kaggle_datasets()
+        print(f"  • {len(self.kaggle_candidates)} Kaggle dataset(s) listed as candidates "
+              f"(hardcoded names, not downloaded; not part of the inventory)")
 
         print(f"  ✓ Found {len(sources)} data sources")
         return sources
@@ -247,7 +251,10 @@ class DataValidator:
         return sources
 
     def _scan_kaggle_datasets(self) -> List[DataSourceMetadata]:
-        """Check for Kaggle datasets and metadata."""
+        """Return a hardcoded list of candidate Kaggle stock datasets.
+
+        This does not query the Kaggle API or check for local downloads; the entries
+        are placeholders marked 'Not yet downloaded'."""
         sources = []
         # Check if .kaggle/kaggle.json exists and list datasets
         kaggle_meta = Path.home() / ".kaggle"
