@@ -370,8 +370,8 @@ class DataValidator:
                 for sname in source_names:
                     if sname in self._loaded_data:
                         df = self._loaded_data[sname].copy()
-                        if 'symbol' in df.columns or 'Symbol' in df.columns:
-                            sym_col = 'symbol' if 'symbol' in df.columns else 'Symbol'
+                        sym_col = self._symbol_column(df)
+                        if sym_col is not None:
                             df = df[df[sym_col] == symbol]
                         dfs.append((sname, df))
 
@@ -532,13 +532,17 @@ class DataValidator:
 
         return "\n".join(lines)
 
-    @staticmethod
-    def _extract_symbols(df: pd.DataFrame) -> set:
+    SYMBOL_COLUMNS = ('symbol', 'Symbol', 'ticker', 'Ticker', 'SYMBOL')
+
+    @classmethod
+    def _symbol_column(cls, df: pd.DataFrame) -> Optional[str]:
+        return next((c for c in cls.SYMBOL_COLUMNS if c in df.columns), None)
+
+    @classmethod
+    def _extract_symbols(cls, df: pd.DataFrame) -> set:
         """Extract unique symbols from DataFrame."""
-        for col in ['symbol', 'Symbol', 'ticker', 'Ticker', 'SYMBOL']:
-            if col in df.columns:
-                return set(df[col].unique())
-        return set()
+        col = cls._symbol_column(df)
+        return set(df[col].unique()) if col is not None else set()
 
     @staticmethod
     def _extract_date_range(df: pd.DataFrame) -> Tuple[str, str]:
