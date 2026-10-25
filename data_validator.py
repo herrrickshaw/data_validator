@@ -122,6 +122,7 @@ class DataValidator:
         self.cache_seed = self.base_path / "cache_seed"
         self.report = None
         self._loaded_data = {}  # Cache loaded DataFrames
+        self.cross_source_errors: List[Dict[str, Any]] = []  # comparisons that raised
 
     def run_full_validation(self) -> ValidationReport:
         """Run complete validation pipeline."""
@@ -400,9 +401,14 @@ class DataValidator:
                                         discrepancy_pct=float(row.pct),
                                     ))
             except Exception as e:
-                pass  # Continue on errors
+                # Do not let a failed comparison masquerade as "no discrepancy".
+                self.cross_source_errors.append(
+                    {"symbol": symbol, "sources": list(source_names), "error": repr(e)})
 
         print(f"  ✓ Found {len(issues)} cross-source inconsistencies")
+        if self.cross_source_errors:
+            print(f"  ⚠️  {len(self.cross_source_errors)} symbol comparison(s) could not be run "
+                  f"(see cross_source_errors); they are NOT counted as consistent")
         return issues
 
     def _detect_data_leakage(self) -> List[DataLeakageIssue]:
@@ -520,6 +526,7 @@ class DataValidator:
             "🔗 CROSS-SOURCE ISSUES:",
             f"  • Price discrepancies (>2%): {sum(1 for i in cross_issues if i.field == 'close')}",
             f"  • Date range mismatches: {sum(1 for i in cross_issues if i.field == 'date')}",
+            f"  • Comparisons that failed to run: {len(self.cross_source_errors)}",
             "",
             "⚠️  DATA LEAKAGE RISKS:",
             f"  • Future-looking operations: {sum(1 for i in leakage_issues if i.issue_type == 'future_data')}",
