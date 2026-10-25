@@ -358,7 +358,7 @@ class DataValidator:
 
         print(f"  • Checking {len(common_symbols)} symbols across sources...")
 
-        for symbol, source_names in list(common_symbols.items())[:20]:  # Sample check
+        for symbol, source_names in common_symbols.items():  # every common symbol
             try:
                 dfs = []
                 for sname in source_names:
@@ -369,36 +369,30 @@ class DataValidator:
                             df = df[df[sym_col] == symbol]
                         dfs.append((sname, df))
 
-                # Compare close prices
+                # Compare close prices on every common date
                 if len(dfs) >= 2 and all(len(df) > 0 for _, df in dfs):
                     for i, (sname1, df1) in enumerate(dfs[:-1]):
                         for sname2, df2 in dfs[i+1:]:
-                            # Merge on date and compare close
                             if 'close' in df1.columns and 'close' in df2.columns:
-                                common_dates = pd.to_datetime(
-                                    set(pd.to_datetime(df1['date'] if 'date' in df1.columns else df1.index)) &
-                                    set(pd.to_datetime(df2['date'] if 'date' in df2.columns else df2.index))
-                                )
-
-                                for date in list(common_dates)[:5]:  # Sample
-                                    val1 = df1[df1['date'] == date]['close'].values
-                                    val2 = df2[df2['date'] == date]['close'].values
-
-                                    if len(val1) > 0 and len(val2) > 0:
-                                        v1, v2 = float(val1[0]), float(val2[0])
-                                        if v1 > 0:
-                                            pct_diff = abs(v1 - v2) / v1
-                                            if pct_diff > 0.02:  # >2% difference
-                                                issues.append(CrossSourceIssue(
-                                                    symbol=symbol,
-                                                    date=str(date),
-                                                    source_1=sname1,
-                                                    source_2=sname2,
-                                                    field='close',
-                                                    value_1=v1,
-                                                    value_2=v2,
-                                                    discrepancy_pct=pct_diff
-                                                ))
+                                a = pd.DataFrame({'date': pd.to_datetime(df1['date']),
+                                                  'v1': pd.to_numeric(df1['close'])})
+                                b = pd.DataFrame({'date': pd.to_datetime(df2['date']),
+                                                  'v2': pd.to_numeric(df2['close'])})
+                                m = a.drop_duplicates('date').merge(
+                                    b.drop_duplicates('date'), on='date').sort_values('date')
+                                m = m[m['v1'] > 0]
+                                m['pct'] = (m['v1'] - m['v2']).abs() / m['v1']
+                                for row in m[m['pct'] > 0.02].itertuples(index=False):  # >2%
+                                    issues.append(CrossSourceIssue(
+                                        symbol=symbol,
+                                        date=str(row.date),
+                                        source_1=sname1,
+                                        source_2=sname2,
+                                        field='close',
+                                        value_1=float(row.v1),
+                                        value_2=float(row.v2),
+                                        discrepancy_pct=float(row.pct),
+                                    ))
             except Exception as e:
                 pass  # Continue on errors
 
