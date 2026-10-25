@@ -434,7 +434,7 @@ class DataValidator:
 
         py_files = list(self.base_path.glob("**/*.py"))
 
-        for py_file in py_files[:50]:  # Sample analysis
+        for py_file in py_files:  # all of them: the summary reports len(py_files)
             try:
                 with open(py_file, 'r') as f:
                     content = f.read()
