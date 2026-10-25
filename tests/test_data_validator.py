@@ -138,7 +138,10 @@ def test_cross_source_reports_a_large_price_discrepancy(tmp_path):
     issues = v._check_cross_source_consistency(sources)
     assert len(issues) == len(RECENT)
     assert {i.field for i in issues} == {"close"}
-    assert issues[0].discrepancy_pct == pytest.approx(0.5)
+    i = issues[0]
+    # discrepancy is relative to whichever source is listed first (glob order)
+    expected = 0.5 if (i.source_1, i.value_1) == ("src_a", 100.0) else 50 / 150
+    assert i.discrepancy_pct == pytest.approx(expected)
 
 
 def test_cross_source_agreeing_sources_have_no_issues(tmp_path):
