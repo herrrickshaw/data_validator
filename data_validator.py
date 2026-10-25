@@ -309,8 +309,9 @@ class DataValidator:
                         errors.append(f"Column '{col}' should be numeric but is {df[col].dtype}")
 
             # Check 4: Price sanity (OHLC order)
-            if all(c in df.columns for c in ['open', 'high', 'low', 'close']):
-                invalid = (df['high'] < df['low']).sum()
+            lower = {c.lower(): c for c in df.columns}
+            if all(c in lower for c in ['open', 'high', 'low', 'close']):
+                invalid = (df[lower['high']] < df[lower['low']]).sum()
                 if invalid > 0:
                     errors.append(f"{invalid} rows with high < low (invalid OHLC)")
 
