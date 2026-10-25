@@ -428,7 +428,7 @@ class DataValidator:
             ],
             "unfair_split": [
                 r"split.*random_state.*=.*None",  # Non-reproducible split
-                r"sample\(\).*frac",  # Random sampling without seed
+                r"\.sample\((?![^)]*random_state)[^)]*frac",  # Random sampling without seed
             ],
         }
 
