@@ -573,8 +573,8 @@ class DataValidator:
 
     @staticmethod
     def _compute_file_hash(path: Path, algorithm: str = "sha256") -> str:
-        """Compute file hash."""
-        hasher = hashlib.sha256()
+        """Compute file hash with the requested hashlib algorithm."""
+        hasher = hashlib.new(algorithm)
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hasher.update(chunk)

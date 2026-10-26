@@ -231,3 +231,15 @@ def test_report_roundtrips_to_json(tmp_path):
     import json
     d = json.loads(out.read_text())
     assert d["total_records"] == 3 and d["data_sources"][0]["source_name"] == "x"
+
+
+def test_compute_file_hash_honours_algorithm(tmp_path):
+    # the `algorithm` parameter must select the digest, not be silently ignored
+    p = tmp_path / "f.bin"
+    p.write_bytes(b"hello world")
+    assert dv.DataValidator._compute_file_hash(p, algorithm="md5") == (
+        "5eb63bbbe01eeed093cb22bb8f5acdc3"  # md5("hello world"), hand-computed
+    )
+    assert dv.DataValidator._compute_file_hash(p, algorithm="sha256") == (
+        "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+    )
