@@ -4,6 +4,7 @@
 pattern or a type needs no change to the scanner.  ``scan_lines`` is pure (lines in,
 ``(issue_type, line_number)`` hits out) so it can be tested without touching disk.
 """
+
 from __future__ import annotations
 
 import re
@@ -11,16 +12,16 @@ from typing import Dict, Iterable, List, Tuple
 
 LEAKAGE_PATTERNS: Dict[str, List[str]] = {
     "future_data": [
-        r"\.shift\(-\d+\)",                    # negative shift = looking forward
+        r"\.shift\(-\d+\)",  # negative shift = looking forward
         r"\.rolling\(.*\)\.mean\(\).*\[-1\]",  # future-looking rolling
     ],
     "test_in_train": [
-        r"test.*=.*\[:len",                    # overlapping splits
-        r"train.*=.*all_data",                 # training on all data
+        r"test.*=.*\[:len",  # overlapping splits
+        r"train.*=.*all_data",  # training on all data
     ],
     "unfair_split": [
-        r"split.*random_state.*=.*None",       # non-reproducible split
-        r"sample\(\).*frac",                   # random sampling without seed
+        r"split.*random_state.*=.*None",  # non-reproducible split
+        r"sample\(\).*frac",  # random sampling without seed
     ],
 }
 

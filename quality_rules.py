@@ -6,6 +6,7 @@ new rule is added with ``@register_rule`` without editing the validator.  Rule o
 matters: ``check_date_gaps`` converts the date column to datetime in place, exactly
 as the original inline code did, and later rules/consumers see that conversion.
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -15,10 +16,10 @@ import pandas as pd
 
 Rule = Callable[[pd.DataFrame], List[str]]
 
-HIGH_NULL_FRACTION = 0.1        # a column is flagged when > 10% of its values are null
-MAX_DATE_GAP_DAYS = 5           # a gap is a consecutive-row step of more than this
-MAX_DATE_GAPS = 10              # more gaps than this is flagged
-STALE_AFTER_DAYS = 30           # last observation older than this is flagged
+HIGH_NULL_FRACTION = 0.1  # a column is flagged when > 10% of its values are null
+MAX_DATE_GAP_DAYS = 5  # a gap is a consecutive-row step of more than this
+MAX_DATE_GAPS = 10  # more gaps than this is flagged
+STALE_AFTER_DAYS = 30  # last observation older than this is flagged
 PRICE_COLUMNS = ("open", "high", "low", "close", "volume")
 OHLC_COLUMNS = ("open", "high", "low", "close")
 QUALITY_PENALTY_PER_ERROR = 0.1

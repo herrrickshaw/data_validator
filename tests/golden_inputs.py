@@ -1,4 +1,5 @@
 """Deterministic synthetic inputs for the data_validator golden tests (no network, no real data)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,8 +10,15 @@ import pandas as pd
 
 def _ohlc(n: int = 30) -> pd.DataFrame:
     close = np.linspace(100.0, 110.0, n)
-    return pd.DataFrame({"open": close, "high": close + 1, "low": close - 1, "close": close,
-                         "volume": np.arange(n) + 1000})
+    return pd.DataFrame(
+        {
+            "open": close,
+            "high": close + 1,
+            "low": close - 1,
+            "close": close,
+            "volume": np.arange(n) + 1000,
+        }
+    )
 
 
 def golden_frames() -> dict:
@@ -25,10 +33,19 @@ def golden_frames() -> dict:
     badtype = clean.copy()
     badtype["Volume"] = ["x"] * 30
     gaps = _ohlc(14)
-    gaps["Date"] = pd.to_datetime(["2020-01-01"]) .repeat(14) + pd.to_timedelta(np.arange(14) * 9, "D")
+    gaps["Date"] = pd.to_datetime(["2020-01-01"]).repeat(14) + pd.to_timedelta(
+        np.arange(14) * 9, "D"
+    )
     nodate = _ohlc(5)
-    return {"clean_stale": clean, "dup": dup, "nulls": nulls, "badohlc": badohlc,
-            "badtype": badtype, "gaps_capital_date": gaps, "nodate": nodate}
+    return {
+        "clean_stale": clean,
+        "dup": dup,
+        "nulls": nulls,
+        "badohlc": badohlc,
+        "badtype": badtype,
+        "gaps_capital_date": gaps,
+        "nodate": nodate,
+    }
 
 
 def write_base(base: Path) -> Path:
