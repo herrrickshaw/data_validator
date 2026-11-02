@@ -16,17 +16,21 @@ Usage:
     report.save_report("data_validation_report.json")
 """
 
-import json
-import os
 import hashlib
-from datetime import datetime, timedelta
+import json
+import logging
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional, Any
-import warnings
+from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
 import numpy as np
-from dataclasses import dataclass, asdict, field
+import pandas as pd
+
+from leakage_scan import scan_lines
+from quality_rules import quality_score, run_rules
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -234,17 +238,14 @@ class DataValidator:
                         columns=df.columns.tolist(),
                     )
                     sources.append(metadata)
-                except Exception as e:
-                    pass  # Skip files that can't be read
+                except Exception as exc:
+                    logger.debug("skipping unreadable file: %s", exc)
 
         return sources
 
     def _scan_kaggle_datasets(self) -> List[DataSourceMetadata]:
         """Check for Kaggle datasets and metadata."""
         sources = []
-        # Check if .kaggle/kaggle.json exists and list datasets
-        kaggle_meta = Path.home() / ".kaggle"
-
         # List common stock market datasets on Kaggle
         # Note: Requires kaggle API to be installed and authenticated
         stock_datasets = [
@@ -283,49 +284,10 @@ class DataValidator:
 
             self._loaded_data[metadata.source_name] = df
 
-            # Run quality checks
-            errors = []
-
-            # Check 1: Missing data analysis
-            missing_pct = df.isnull().sum() / len(df)
-            if (missing_pct > 0.1).any():
-                errors.append(f"High nulls in {missing_pct[missing_pct > 0.1].index.tolist()}")
-
-            # Check 2: Duplicate rows
-            if df.duplicated().sum() > 0:
-                errors.append(f"{df.duplicated().sum()} duplicate rows found")
-
-            # Check 3: Data types
-            for col in df.columns:
-                if col.lower() in ['open', 'high', 'low', 'close', 'volume']:
-                    if not pd.api.types.is_numeric_dtype(df[col]):
-                        errors.append(f"Column '{col}' should be numeric but is {df[col].dtype}")
-
-            # Check 4: Price sanity (OHLC order)
-            if all(c in df.columns for c in ['open', 'high', 'low', 'close']):
-                invalid = (df['high'] < df['low']).sum()
-                if invalid > 0:
-                    errors.append(f"{invalid} rows with high < low (invalid OHLC)")
-
-            # Check 5: Date continuity (for time series)
-            if 'date' in df.columns or 'Date' in df.columns:
-                date_col = 'date' if 'date' in df.columns else 'Date'
-                df[date_col] = pd.to_datetime(df[date_col])
-                gaps = (df[date_col].diff() > timedelta(days=5)).sum()
-                if gaps > 10:
-                    errors.append(f"Many date gaps detected ({gaps} gaps > 5 days)")
-
-            # Check 6: Freshness
-            if 'date' in df.columns or 'Date' in df.columns:
-                date_col = 'date' if 'date' in df.columns else 'Date'
-                max_date = pd.to_datetime(df[date_col]).max()
-                days_stale = (datetime.now().date() - max_date.date()).days
-                if days_stale > 30:
-                    errors.append(f"Data is {days_stale} days stale (last date: {max_date.date()})")
+            errors = run_rules(df)
 
             metadata.validation_errors = errors
-            quality_score = 1.0 - (len(errors) * 0.1)  # Simple scoring
-            metadata.data_quality_score = max(0, quality_score)
+            metadata.data_quality_score = quality_score(len(errors))
 
             status = "✓" if not errors else "⚠️"
             print(f"  {status} {metadata.source_name}: {len(df):,} rows, "
@@ -399,8 +361,8 @@ class DataValidator:
                                                     value_2=v2,
                                                     discrepancy_pct=pct_diff
                                                 ))
-            except Exception as e:
-                pass  # Continue on errors
+            except Exception as exc:
+                logger.debug("cross-source comparison failed for %s: %s", symbol, exc)
 
         print(f"  ✓ Found {len(issues)} cross-source inconsistencies")
         return issues
@@ -409,43 +371,21 @@ class DataValidator:
         """Scan Python scripts for potential data leakage."""
         issues = []
 
-        # Patterns that suggest data leakage
-        leakage_patterns = {
-            "future_data": [
-                r"\.shift\(-\d+\)",  # Negative shift = looking forward
-                r"\.rolling\(.*\)\.mean\(\).*\[-1\]",  # Future-looking rolling
-            ],
-            "test_in_train": [
-                r"test.*=.*\[:len",  # Overlapping splits
-                r"train.*=.*all_data",  # Training on all data
-            ],
-            "unfair_split": [
-                r"split.*random_state.*=.*None",  # Non-reproducible split
-                r"sample\(\).*frac",  # Random sampling without seed
-            ],
-        }
-
         py_files = list(self.base_path.glob("**/*.py"))
 
         for py_file in py_files[:50]:  # Sample analysis
             try:
                 with open(py_file, 'r') as f:
-                    content = f.read()
-                    lines = content.split('\n')
-
-                for issue_type, patterns in leakage_patterns.items():
-                    for pattern in patterns:
-                        import re
-                        for i, line in enumerate(lines):
-                            if re.search(pattern, line):
-                                issues.append(DataLeakageIssue(
-                                    file_path=str(py_file),
-                                    line_number=i+1,
-                                    issue_type=issue_type,
-                                    severity="low",  # Flag for review
-                                ))
-            except Exception as e:
-                pass
+                    lines = f.read().split('\n')
+            except Exception:
+                continue  # unreadable file: skip, as before
+            for issue_type, line_number in scan_lines(lines):
+                issues.append(DataLeakageIssue(
+                    file_path=str(py_file),
+                    line_number=line_number,
+                    issue_type=issue_type,
+                    severity="low",  # Flag for review
+                ))
 
         print(f"  ✓ Scanned {len(py_files)} scripts, found {len(issues)} potential leakage flags")
         return issues
@@ -469,8 +409,8 @@ class DataValidator:
 
                 if used_sources:
                     mapping[str(py_file)] = used_sources
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("repo mapping skipped %s: %s", py_file, exc)
 
         return mapping
 
@@ -548,8 +488,8 @@ class DataValidator:
                 try:
                     dates = pd.to_datetime(df[col])
                     return (str(dates.min().date()), str(dates.max().date()))
-                except:
-                    pass
+                except Exception as exc:
+                    logger.debug("unparseable date column %s: %s", col, exc)
         return ("unknown", "unknown")
 
     @staticmethod
