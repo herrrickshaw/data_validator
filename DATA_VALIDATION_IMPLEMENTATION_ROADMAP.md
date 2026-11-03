@@ -41,7 +41,7 @@ Built comprehensive **data validation, consistency, and verification system** wi
 **Run:**
 ```bash
 cd /Users/umashankar/Downloads/code/python_files
-python3 data_validator.py
+python3 -m data_validator
 # Output: /tmp/data_validation_report.json
 ```
 
@@ -393,7 +393,7 @@ A: Run `data_validator.py`, check the JSON report, create an issue with findings
 
 | File | Location | How to Use |
 |------|----------|-----------|
-| **Validator** | `data_validator.py` | `python3 data_validator.py` |
+| **Validator** | `data_validator.py` | `python3 -m data_validator` |
 | **Analyzer** | `repo_data_analyzer.py` | `python3 repo_data_analyzer.py` |
 | **Config** | `data_config.py` | `from data_config import ...` |
 | **Guide** | `DATA_VALIDATION_GUIDE.md` | Read for details |

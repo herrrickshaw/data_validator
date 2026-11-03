@@ -24,7 +24,7 @@ git clone https://github.com/herrrickshaw/data_validator.git
 cd data_validator
 python -m venv .venv && source .venv/bin/activate
 pip install pandas numpy pyarrow pytest      # the validator needs only pandas, numpy (+ pyarrow for parquet)
-python data_validator.py                     # validates DataValidator's default base path, writes /tmp/data_validation_report.json
+python3 -m data_validator                     # validates DataValidator's default base path, writes /tmp/data_validation_report.json
 ```
 Programmatic use, pointing at your own data directory (it must contain a `cache_seed/` folder):
 ```python
@@ -68,7 +68,7 @@ Quality rules run on whatever parquet/CSV files sit under the base path. The Kag
 
 ## Configuration
 - `DataValidator(base_path=...)`: defaults to a hard-coded author path (`/Users/umashankar/Downloads/code/python_files`),
-  so pass your own. `python data_validator.py` always writes its report to `/tmp/data_validation_report.json`.
+  so pass your own. `python3 -m data_validator` always writes its report to `/tmp/data_validation_report.json`.
 - Credentials (screener.in, brokers) are read by individual modules and are never committed.
 
 ## Testing

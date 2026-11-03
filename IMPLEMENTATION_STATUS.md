@@ -44,7 +44,7 @@
 
 **Run it:**
 ```bash
-python3 data_validator.py
+python3 -m data_validator
 # Output: /tmp/data_validation_report.json
 ```
 
@@ -121,7 +121,7 @@ python3 backtest_weight_validation.py --market US
 ### Immediately (Today)
 ```bash
 # 1. Run diagnostics
-python3 data_validator.py
+python3 -m data_validator
 python3 repo_data_analyzer.py
 
 # 2. Test fixed backtest scripts
@@ -198,7 +198,7 @@ All work has been:
 
 ### Phase 1: Validate (Today)
 ```bash
-python3 data_validator.py        # See current state
+python3 -m data_validator        # See current state
 python3 repo_data_analyzer.py    # Identify issues
 ```
 
@@ -219,7 +219,7 @@ errors = config.validation.validate_dataframe(df)
 ### Phase 4: Monitor (Ongoing)
 ```bash
 # Weekly checks
-python3 data_validator.py    # Freshness check
+python3 -m data_validator    # Freshness check
 python3 repo_data_analyzer.py # Pattern detection
 ```
 

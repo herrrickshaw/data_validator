@@ -37,7 +37,7 @@ Build comprehensive validation framework with 4 modules:
 
 **Run it:**
 ```bash
-python data_validator.py
+python -m data_validator
 ```
 
 **Output:**
@@ -205,7 +205,7 @@ BACKTEST:          max 365 days old  (research, not live)
 
 ```bash
 # 1. Generate data validation report
-python data_validator.py
+python -m data_validator
 
 # 2. Analyze repository data usage
 python repo_data_analyzer.py
@@ -440,7 +440,7 @@ for ds in datasets:
 
 ## 📋 Checklist: What to Do Now
 
-- [ ] Run `python data_validator.py` and save report
+- [ ] Run `python3 -m data_validator` and save report
 - [ ] Run `python repo_data_analyzer.py` and save report
 - [ ] Read `data_config.py` to understand date splits and rules
 - [ ] Fix 3 critical scripts flagged with data leakage (1-2 hours each)
@@ -477,7 +477,7 @@ for ds in datasets:
 
 | File | Purpose | Run with |
 |------|---------|----------|
-| `data_validator.py` | Inventory + quality + consistency | `python data_validator.py` |
+| `data_validator.py` | Inventory + quality + consistency | `python3 -m data_validator` |
 | `repo_data_analyzer.py` | Script analysis + split detection | `python repo_data_analyzer.py` |
 | `data_config.py` | Single source of truth (import in scripts) | `from data_config import ...` |
 | `DATA_VALIDATION_GUIDE.md` | This guide | Read & reference |

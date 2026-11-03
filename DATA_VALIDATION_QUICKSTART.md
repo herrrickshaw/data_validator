@@ -21,7 +21,7 @@
 cd /Users/umashankar/Downloads/code/python_files
 
 # Run validation on your data
-python3 data_validator.py
+python3 -m data_validator
 # Output: /tmp/data_validation_report.json
 
 # Analyze your scripts
