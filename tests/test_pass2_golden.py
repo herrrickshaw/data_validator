@@ -151,6 +151,18 @@ def test_generate_report_golden(capsys, case):
 # --- quarterly_data_analyzer.fetch_company_data -------------------------------------
 
 
+def _portable_strftime(obj):
+    """quarterly_data_analyzer formats labels with the non-standard ``%q``: macOS strftime renders it as ``q``
+    (what the goldens recorded), glibc leaves ``%q`` verbatim. Normalise to the recorded form so the test is OS-independent."""
+    if isinstance(obj, str):
+        return obj.replace("-Q%q", "-Qq")
+    if isinstance(obj, dict):
+        return {k: _portable_strftime(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_portable_strftime(v) for v in obj]
+    return obj
+
+
 class _FakeTicker:
     def __init__(self, inc, cf, bs):
         self.quarterly_income_stmt, self.quarterly_cashflow, self.quarterly_balance_sheet = (
@@ -214,5 +226,5 @@ def test_fetch_company_data_golden(monkeypatch, case):
     import quarterly_data_analyzer as qa
 
     out = qa.QuarterlyAnalyzer().fetch_company_data("TEST")
-    check(f"qtr_{case}", out)
+    check(f"qtr_{case}", _portable_strftime(out))
     sys.modules.pop("quarterly_data_analyzer", None)
