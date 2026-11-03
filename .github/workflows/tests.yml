@@ -43,4 +43,12 @@ jobs:
           pip install pandas numpy pyarrow lmdb requests openpyxl pytest
 
       - name: Run tests
-        run: pytest -q
+        # These four modules import modules that did not survive the repo extraction
+        # (stock_utils, custom_screener, strategies, bhavcopy_store), so they cannot run
+        # anywhere, including main. They are kept on disk and ignored explicitly here.
+        run: >-
+          pytest -q
+          --ignore=tests/test_cleaning.py
+          --ignore=tests/test_liquidity_and_custom.py
+          --ignore=tests/test_strategies.py
+          --ignore=tests/test_store.py

@@ -76,8 +76,9 @@ Quality rules run on whatever parquet/CSV files sit under the base path. The Kag
 pytest -q
 ```
 Four test modules (`test_cleaning.py`, `test_liquidity_and_custom.py`, `test_strategies.py`, `test_store.py`) import modules
-that did not survive the extraction (`stock_utils`, `custom_screener`, `strategies`, `bhavcopy_store`) and fail at
-collection; the rest pass. CI (`.github/workflows/tests.yml`) runs ruff, black and pytest.
+that did not survive the extraction (`stock_utils`, `custom_screener`, `strategies`, `bhavcopy_store`) and fail locally; the
+rest pass. CI (`.github/workflows/tests.yml`) runs ruff, black and pytest, and lists those four files under `--ignore` in the
+pytest step (with a comment saying why). The files are kept on disk; drop the `--ignore` flags if the modules are restored.
 
 ## Limitations and known issues
 - Data not recovered: `cache_seed/*.parquet` (47 files) and `india_stocks_2021_2026.db` were Git-LFS-tracked in the source
