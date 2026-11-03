@@ -16,9 +16,13 @@ Process:
 
 import pandas as pd
 import numpy as np
+import logging
 from itertools import product
 from typing import Dict, Tuple, List
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+
+
+logger = logging.getLogger(__name__)
 
 
 class F1HyperparameterTuner:
@@ -125,7 +129,8 @@ class F1HyperparameterTuner:
                 train_f1 = f1_score(self.train['outperform'], predictions, zero_division=0)
                 train_precision = precision_score(self.train['outperform'], predictions, zero_division=0)
                 train_recall = recall_score(self.train['outperform'], predictions, zero_division=0)
-            except:
+            except Exception as exc:
+                logger.debug("ignored error: %s", exc)
                 train_f1 = 0
                 train_precision = 0
                 train_recall = 0
@@ -140,7 +145,8 @@ class F1HyperparameterTuner:
                 test_f1 = f1_score(self.test['outperform'], test_predictions, zero_division=0)
                 test_precision = precision_score(self.test['outperform'], test_predictions, zero_division=0)
                 test_recall = recall_score(self.test['outperform'], test_predictions, zero_division=0)
-            except:
+            except Exception as exc:
+                logger.debug("ignored error: %s", exc)
                 test_f1 = 0
                 test_precision = 0
                 test_recall = 0

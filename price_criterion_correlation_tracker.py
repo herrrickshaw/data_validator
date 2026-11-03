@@ -8,9 +8,13 @@ Validates weightings in the 11-D model.
 
 import pandas as pd
 import numpy as np
+import logging
 from scipy.stats import spearmanr, pearsonr
 import warnings
 warnings.filterwarnings('ignore')
+
+
+logger = logging.getLogger(__name__)
 
 
 class PriceCriterionCorrelationTracker:
@@ -342,7 +346,8 @@ if __name__ == "__main__":
     print("📊 Loading screening results...")
     try:
         results = pd.read_csv('/Users/umashankar/Downloads/code/python_files/expansion_screening_results_11d.csv')
-    except:
+    except Exception as exc:
+        logger.debug("ignored error: %s", exc)
         print("Results file not found. Using demo data...")
         # Create demo data if file doesn't exist
         np.random.seed(42)

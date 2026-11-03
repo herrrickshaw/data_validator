@@ -8,7 +8,9 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import logging
 import warnings
+logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore')
 
 
@@ -17,6 +19,100 @@ class QuarterlyAnalyzer:
 
     def __init__(self):
         self.companies = []
+
+    @staticmethod
+    def _stmt_value(stmt, name: str, qtr_date):
+        """stmt.loc[name, qtr_date], or None when the statement has no such line."""
+        return stmt.loc[name, qtr_date] if name in stmt.index else None
+
+    def _income_metrics(self, qtr_is, qtr_date, qtr_metrics: dict, v: dict) -> None:
+        """Revenue, operating/net income, interest expense and margins; keeps locals in `v`."""
+        v['total_revenue'] = self._stmt_value(qtr_is, 'Total Revenue', qtr_date)
+        v['operating_income'] = self._stmt_value(qtr_is, 'Operating Income', qtr_date)
+        v['net_income'] = self._stmt_value(qtr_is, 'Net Income', qtr_date)
+        v['interest_expense'] = self._stmt_value(qtr_is, 'Interest Expense', qtr_date)
+
+        qtr_metrics['revenue'] = v['total_revenue']
+        qtr_metrics['operating_income'] = v['operating_income']
+        qtr_metrics['net_income'] = v['net_income']
+        qtr_metrics['interest_expense'] = v['interest_expense']
+
+        if v['total_revenue'] and v['operating_income']:
+            qtr_metrics['oi_margin'] = (v['operating_income'] / v['total_revenue'] * 100)
+        if v['total_revenue'] and v['net_income']:
+            qtr_metrics['ni_margin'] = (v['net_income'] / v['total_revenue'] * 100)
+
+    def _cashflow_metrics(self, qtr_cf, qtr_date, qtr_metrics: dict, v: dict) -> None:
+        """Operating cash flow, capex, FCF and FCF margin."""
+        ocf = self._stmt_value(qtr_cf, 'Operating Cash Flow', qtr_date)
+        capex = self._stmt_value(qtr_cf, 'Capital Expenditure', qtr_date)
+
+        qtr_metrics['ocf'] = ocf
+        qtr_metrics['capex'] = abs(capex) if capex else None
+
+        if ocf and capex:
+            qtr_metrics['fcf'] = ocf - abs(capex)
+            total_revenue = v['total_revenue']  # unset if the income block failed, as before
+            qtr_metrics['fcf_margin'] = (qtr_metrics['fcf'] / total_revenue * 100) if total_revenue else None
+
+    def _balance_metrics(self, qtr_bs, qtr_date, qtr_metrics: dict, v: dict) -> None:
+        """Assets, debt, equity, current ratio, D/E and asset turnover; keeps locals in `v`."""
+        v['total_assets'] = self._stmt_value(qtr_bs, 'Total Assets', qtr_date)
+        v['total_debt'] = self._stmt_value(qtr_bs, 'Total Debt', qtr_date)
+        v['total_equity'] = self._stmt_value(qtr_bs, 'Total Stockholder Equity', qtr_date)
+        has_both = 'Current Assets' in qtr_bs.index and 'Current Liabilities' in qtr_bs.index
+        current_ratio = (
+            (qtr_bs.loc['Current Assets', qtr_date] / qtr_bs.loc['Current Liabilities', qtr_date])
+            if has_both else None
+        )
+
+        qtr_metrics['total_assets'] = v['total_assets']
+        qtr_metrics['total_debt'] = v['total_debt']
+        qtr_metrics['total_equity'] = v['total_equity']
+        qtr_metrics['current_ratio'] = current_ratio
+
+        if v['total_equity'] and v['total_equity'] > 0:
+            qtr_metrics['de_ratio'] = v['total_debt'] / v['total_equity'] if v['total_debt'] else 0
+        if v['total_assets'] and v['total_assets'] > 0:
+            qtr_metrics['asset_turnover'] = (
+                v['total_revenue'] / v['total_assets'] if v['total_revenue'] else None
+            )
+
+    @staticmethod
+    def _roic_metric(qtr_metrics: dict, v: dict) -> None:
+        """ROIC from NOPAT over invested capital (tax rate estimated from NI / operating income)."""
+        operating_income, total_debt, total_equity = (
+            v['operating_income'], v['total_debt'], v['total_equity']
+        )
+        if operating_income and total_debt and total_equity:
+            tax_rate = 1 - (v['net_income'] / operating_income) if operating_income > 0 else 0.25
+            nopat = operating_income * (1 - tax_rate)
+            invested_capital = total_debt + total_equity
+            if invested_capital > 0:
+                qtr_metrics['roic'] = (nopat / invested_capital * 100)
+
+    def _quarter_metrics(self, qtr_date, statements: tuple, v: dict) -> dict:
+        """All metrics for one quarter. Each block is independent: a failure skips only that block."""
+        qtr_is, qtr_cf, qtr_bs = statements
+        qtr_metrics = {
+            'date': qtr_date,
+            'quarter_label': qtr_date.strftime('%Y-Q%q'),
+        }
+        blocks = (
+            (self._income_metrics, qtr_is),
+            (self._cashflow_metrics, qtr_cf),
+            (self._balance_metrics, qtr_bs),
+        )
+        for block, stmt in blocks:
+            try:
+                block(stmt, qtr_date, qtr_metrics, v)
+            except Exception as exc:
+                logger.debug("%s skipped for %s: %s", block.__name__, qtr_date, exc)
+        try:
+            self._roic_metric(qtr_metrics, v)
+        except Exception as exc:
+            logger.debug("roic skipped for %s: %s", qtr_date, exc)
+        return qtr_metrics
 
     def fetch_company_data(self, ticker: str) -> dict:
         """Fetch 5 years of quarterly data for a company"""
@@ -43,84 +139,21 @@ class QuarterlyAnalyzer:
                 'quarters': [],
             }
 
-            # Extract metrics for each quarter
-            for i, qtr_date in enumerate(quarters_dates):
-                qtr_metrics = {
-                    'date': qtr_date,
-                    'quarter_label': qtr_date.strftime('%Y-Q%q'),
-                }
-
-                # Income statement
-                try:
-                    total_revenue = qtr_is.loc['Total Revenue', qtr_date] if 'Total Revenue' in qtr_is.index else None
-                    operating_income = qtr_is.loc['Operating Income', qtr_date] if 'Operating Income' in qtr_is.index else None
-                    net_income = qtr_is.loc['Net Income', qtr_date] if 'Net Income' in qtr_is.index else None
-                    interest_expense = qtr_is.loc['Interest Expense', qtr_date] if 'Interest Expense' in qtr_is.index else None
-
-                    qtr_metrics['revenue'] = total_revenue
-                    qtr_metrics['operating_income'] = operating_income
-                    qtr_metrics['net_income'] = net_income
-                    qtr_metrics['interest_expense'] = interest_expense
-
-                    if total_revenue and operating_income:
-                        qtr_metrics['oi_margin'] = (operating_income / total_revenue * 100)
-                    if total_revenue and net_income:
-                        qtr_metrics['ni_margin'] = (net_income / total_revenue * 100)
-                except:
-                    pass
-
-                # Cash flow
-                try:
-                    ocf = qtr_cf.loc['Operating Cash Flow', qtr_date] if 'Operating Cash Flow' in qtr_cf.index else None
-                    capex = qtr_cf.loc['Capital Expenditure', qtr_date] if 'Capital Expenditure' in qtr_cf.index else None
-
-                    qtr_metrics['ocf'] = ocf
-                    qtr_metrics['capex'] = abs(capex) if capex else None
-
-                    if ocf and capex:
-                        qtr_metrics['fcf'] = ocf - abs(capex)
-                        qtr_metrics['fcf_margin'] = (qtr_metrics['fcf'] / total_revenue * 100) if total_revenue else None
-                except:
-                    pass
-
-                # Balance sheet
-                try:
-                    total_assets = qtr_bs.loc['Total Assets', qtr_date] if 'Total Assets' in qtr_bs.index else None
-                    total_debt = qtr_bs.loc['Total Debt', qtr_date] if 'Total Debt' in qtr_bs.index else None
-                    total_equity = qtr_bs.loc['Total Stockholder Equity', qtr_date] if 'Total Stockholder Equity' in qtr_bs.index else None
-                    current_ratio = (qtr_bs.loc['Current Assets', qtr_date] / qtr_bs.loc['Current Liabilities', qtr_date]) if 'Current Assets' in qtr_bs.index and 'Current Liabilities' in qtr_bs.index else None
-
-                    qtr_metrics['total_assets'] = total_assets
-                    qtr_metrics['total_debt'] = total_debt
-                    qtr_metrics['total_equity'] = total_equity
-                    qtr_metrics['current_ratio'] = current_ratio
-
-                    if total_equity and total_equity > 0:
-                        qtr_metrics['de_ratio'] = total_debt / total_equity if total_debt else 0
-                    if total_assets and total_assets > 0:
-                        qtr_metrics['asset_turnover'] = total_revenue / total_assets if total_revenue else None
-                except:
-                    pass
-
-                # ROIC calculation (NEW - CRITICAL PARAMETER)
-                try:
-                    if operating_income and total_debt and total_equity:
-                        # Tax rate estimate (net_income / operating_income ratio)
-                        tax_rate = 1 - (net_income / operating_income) if operating_income > 0 else 0.25
-                        nopat = operating_income * (1 - tax_rate)
-                        invested_capital = total_debt + total_equity
-                        if invested_capital > 0:
-                            qtr_metrics['roic'] = (nopat / invested_capital * 100)
-                except:
-                    pass
-
-                data['quarters'].append(qtr_metrics)
+            # `v` plays the role of the old function-scope locals: values from an earlier
+            # quarter/block stay visible to later ones, and a never-assigned name raises KeyError
+            # (formerly NameError, swallowed per block).
+            v: dict = {}
+            for qtr_date in quarters_dates:
+                data['quarters'].append(
+                    self._quarter_metrics(qtr_date, (qtr_is, qtr_cf, qtr_bs), v)
+                )
 
             # Calculate 5-year trends
             data['trends'] = self._calculate_trends(data['quarters'])
             return data
 
-        except Exception as e:
+        except Exception as exc:
+            logger.debug("fetch_company_data(%s) failed: %s", ticker, exc)
             return None
 
     def _calculate_trends(self, quarters: list) -> dict:
