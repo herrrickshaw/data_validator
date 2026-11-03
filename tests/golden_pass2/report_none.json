@@ -1,0 +1,22 @@
+[
+ "\u26a0\ufe0f  Data validation warnings:",
+ "     \u2022 Missing critical column: open",
+ "     \u2022 Missing critical column: high",
+ "     \u2022 Missing critical column: low",
+ "     \u2022 Missing critical column: close",
+ "     \u2022 Missing critical column: volume",
+ "     \u2022 Missing critical column: date",
+ "",
+ "\ud83d\udcca BACKTEST INITIALIZATION",
+ "   Companies: 1,000",
+ "   Lookback period: 3 years",
+ "   Using proper train/test split: False",
+ "   Date range: 2023-11-04 to 2026-11-03",
+ "",
+ "================================================================================",
+ "BACKTEST RESULTS & COMPARISON",
+ "================================================================================",
+ "",
+ "================================================================================",
+ ""
+]
