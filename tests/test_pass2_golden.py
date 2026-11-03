@@ -63,8 +63,15 @@ SHEET_ROWS = {
     "sparse": [["Sales", 500, 400], ["Net profit", 20]],
     "norows": [["Unrelated", 1, 2]],
 }
-PAGE = {"roe_page": 18.5, "roce_page": 22.1, "market_cap_cr": 5000, "current_price": 250.0,
-        "pe": 20.0, "book_value": 80.0, "dividend_yield": 1.2}
+PAGE = {
+    "roe_page": 18.5,
+    "roce_page": 22.1,
+    "market_cap_cr": 5000,
+    "current_price": 250.0,
+    "pe": 20.0,
+    "book_value": 80.0,
+    "dividend_yield": 1.2,
+}
 
 
 def _xlsx(rows):
@@ -90,13 +97,26 @@ def test_company_financials_golden(monkeypatch, case, page):
 
 
 def _metrics(scale):
-    return dict(n_signals=120, n_outperform=300, tp=70, fp=50, fn=230, tn=650,
-                precision=0.58 * scale, recall=0.23 * scale, f1=0.33 * scale,
-                accuracy=0.72 * scale, avg_buy_return=4.2 * scale, avg_sell_return=-1.1,
-                return_spread=5.3 * scale)
+    return dict(
+        n_signals=120,
+        n_outperform=300,
+        tp=70,
+        fp=50,
+        fn=230,
+        tn=650,
+        precision=0.58 * scale,
+        recall=0.23 * scale,
+        f1=0.33 * scale,
+        accuracy=0.72 * scale,
+        avg_buy_return=4.2 * scale,
+        avg_sell_return=-1.1,
+        return_spread=5.3 * scale,
+    )
 
 
-@pytest.mark.parametrize("case", ["both_big", "both_modest", "both_worse", "baseline", "optimized", "none"])
+@pytest.mark.parametrize(
+    "case", ["both_big", "both_modest", "both_worse", "baseline", "optimized", "none"]
+)
 def test_generate_report_golden(capsys, case):
     from backtest_weight_optimization import WeightBacktester
 
@@ -109,8 +129,18 @@ def test_generate_report_golden(capsys, case):
     elif case == "both_worse":
         opt["f1"] = base["f1"] - 0.02
         opt["precision"] = base["precision"]
-    results = {"baseline": {"both_big": base, "both_modest": base, "both_worse": base,
-                            "baseline": base}.get(case)} if case != "optimized" else {}
+    results = (
+        {
+            "baseline": {
+                "both_big": base,
+                "both_modest": base,
+                "both_worse": base,
+                "baseline": base,
+            }.get(case)
+        }
+        if case != "optimized"
+        else {}
+    )
     if case in ("both_big", "both_modest", "both_worse", "optimized"):
         results["optimized"] = opt
     results = {k: v for k, v in results.items() if v is not None}
@@ -123,21 +153,39 @@ def test_generate_report_golden(capsys, case):
 
 class _FakeTicker:
     def __init__(self, inc, cf, bs):
-        self.quarterly_income_stmt, self.quarterly_cashflow, self.quarterly_balance_sheet = inc, cf, bs
+        self.quarterly_income_stmt, self.quarterly_cashflow, self.quarterly_balance_sheet = (
+            inc,
+            cf,
+            bs,
+        )
 
 
 def _frames(n, drop=()):
-    cols = pd.to_datetime([f"2024-{12 - 3 * i:02d}-30" if i < 4 else f"{2024 - i // 4}-{12 - 3 * (i % 4):02d}-30"
-                           for i in range(n)])
+    cols = pd.to_datetime(
+        [
+            f"2024-{12 - 3 * i:02d}-30" if i < 4 else f"{2024 - i // 4}-{12 - 3 * (i % 4):02d}-30"
+            for i in range(n)
+        ]
+    )
     rng = np.random.default_rng(7)
 
     def mk(names):
         names = [x for x in names if x not in drop]
-        return pd.DataFrame(rng.integers(100, 1000, (len(names), n)).astype(float), index=names, columns=cols)
+        return pd.DataFrame(
+            rng.integers(100, 1000, (len(names), n)).astype(float), index=names, columns=cols
+        )
 
     inc = mk(["Total Revenue", "Operating Income", "Net Income", "Interest Expense"])
     cf = mk(["Operating Cash Flow", "Capital Expenditure"])
-    bs = mk(["Total Assets", "Total Debt", "Total Stockholder Equity", "Current Assets", "Current Liabilities"])
+    bs = mk(
+        [
+            "Total Assets",
+            "Total Debt",
+            "Total Stockholder Equity",
+            "Current Assets",
+            "Current Liabilities",
+        ]
+    )
     return inc, cf, bs
 
 

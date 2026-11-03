@@ -111,7 +111,7 @@ class DataValidator:
             path=str(path),
             created_at=datetime.fromtimestamp(stat.st_ctime).isoformat(),
             last_modified=datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            file_size_mb=stat.st_size / (1024*1024),
+            file_size_mb=stat.st_size / (1024 * 1024),
             record_count=len(df),
             symbols_count=len(symbols),
             date_range=date_range,
@@ -135,7 +135,7 @@ class DataValidator:
                         path=str(cf),
                         created_at=datetime.fromtimestamp(cf.stat().st_ctime).isoformat(),
                         last_modified=datetime.fromtimestamp(cf.stat().st_mtime).isoformat(),
-                        file_size_mb=cf.stat().st_size / (1024*1024),
+                        file_size_mb=cf.stat().st_size / (1024 * 1024),
                         record_count=len(df),
                         symbols_count=len(self._extract_symbols(df)),
                         date_range=self._extract_date_range(df),
@@ -160,18 +160,20 @@ class DataValidator:
         ]
 
         for ds in stock_datasets:
-            sources.append(DataSourceMetadata(
-                source_name=ds.split("/")[-1],
-                source_type="kaggle",
-                path=f"kaggle://{ds}",
-                created_at="unknown",
-                last_modified="unknown",
-                file_size_mb=0,
-                record_count=0,
-                symbols_count=0,
-                date_range=("unknown", "unknown"),
-                validation_errors=["Not yet downloaded"],
-            ))
+            sources.append(
+                DataSourceMetadata(
+                    source_name=ds.split("/")[-1],
+                    source_type="kaggle",
+                    path=f"kaggle://{ds}",
+                    created_at="unknown",
+                    last_modified="unknown",
+                    file_size_mb=0,
+                    record_count=0,
+                    symbols_count=0,
+                    date_range=("unknown", "unknown"),
+                    validation_errors=["Not yet downloaded"],
+                )
+            )
 
         return sources
 
@@ -194,8 +196,10 @@ class DataValidator:
             metadata.data_quality_score = quality_score(len(errors))
 
             status = "✓" if not errors else "⚠️"
-            print(f"  {status} {metadata.source_name}: {len(df):,} rows, "
-                  f"quality={metadata.data_quality_score:.2%}")
+            print(
+                f"  {status} {metadata.source_name}: {len(df):,} rows, "
+                f"quality={metadata.data_quality_score:.2%}"
+            )
 
         except Exception as e:
             metadata.validation_errors.append(f"Failed to validate: {e}")
@@ -203,8 +207,7 @@ class DataValidator:
             print(f"  ✗ {metadata.source_name}: {e}")
 
     def _check_cross_source_consistency(
-        self,
-        sources: List[DataSourceMetadata]
+        self, sources: List[DataSourceMetadata]
     ) -> List[CrossSourceIssue]:
         """Check consistency across data sources."""
         issues = []
@@ -230,41 +233,51 @@ class DataValidator:
                 for sname in source_names:
                     if sname in self._loaded_data:
                         df = self._loaded_data[sname].copy()
-                        if 'symbol' in df.columns or 'Symbol' in df.columns:
-                            sym_col = 'symbol' if 'symbol' in df.columns else 'Symbol'
+                        if "symbol" in df.columns or "Symbol" in df.columns:
+                            sym_col = "symbol" if "symbol" in df.columns else "Symbol"
                             df = df[df[sym_col] == symbol]
                         dfs.append((sname, df))
 
                 # Compare close prices
                 if len(dfs) >= 2 and all(len(df) > 0 for _, df in dfs):
                     for i, (sname1, df1) in enumerate(dfs[:-1]):
-                        for sname2, df2 in dfs[i+1:]:
+                        for sname2, df2 in dfs[i + 1 :]:
                             # Merge on date and compare close
-                            if 'close' in df1.columns and 'close' in df2.columns:
+                            if "close" in df1.columns and "close" in df2.columns:
                                 common_dates = pd.to_datetime(
-                                    set(pd.to_datetime(df1['date'] if 'date' in df1.columns else df1.index)) &
-                                    set(pd.to_datetime(df2['date'] if 'date' in df2.columns else df2.index))
+                                    set(
+                                        pd.to_datetime(
+                                            df1["date"] if "date" in df1.columns else df1.index
+                                        )
+                                    )
+                                    & set(
+                                        pd.to_datetime(
+                                            df2["date"] if "date" in df2.columns else df2.index
+                                        )
+                                    )
                                 )
 
                                 for date in list(common_dates)[:5]:  # Sample
-                                    val1 = df1[df1['date'] == date]['close'].values
-                                    val2 = df2[df2['date'] == date]['close'].values
+                                    val1 = df1[df1["date"] == date]["close"].values
+                                    val2 = df2[df2["date"] == date]["close"].values
 
                                     if len(val1) > 0 and len(val2) > 0:
                                         v1, v2 = float(val1[0]), float(val2[0])
                                         if v1 > 0:
                                             pct_diff = abs(v1 - v2) / v1
                                             if pct_diff > 0.02:  # >2% difference
-                                                issues.append(CrossSourceIssue(
-                                                    symbol=symbol,
-                                                    date=str(date),
-                                                    source_1=sname1,
-                                                    source_2=sname2,
-                                                    field='close',
-                                                    value_1=v1,
-                                                    value_2=v2,
-                                                    discrepancy_pct=pct_diff
-                                                ))
+                                                issues.append(
+                                                    CrossSourceIssue(
+                                                        symbol=symbol,
+                                                        date=str(date),
+                                                        source_1=sname1,
+                                                        source_2=sname2,
+                                                        field="close",
+                                                        value_1=v1,
+                                                        value_2=v2,
+                                                        discrepancy_pct=pct_diff,
+                                                    )
+                                                )
             except Exception as exc:
                 logger.debug("cross-source comparison failed for %s: %s", symbol, exc)
 
@@ -279,17 +292,19 @@ class DataValidator:
 
         for py_file in py_files[:50]:  # Sample analysis
             try:
-                with open(py_file, 'r') as f:
-                    lines = f.read().split('\n')
+                with open(py_file, "r") as f:
+                    lines = f.read().split("\n")
             except Exception:
                 continue  # unreadable file: skip, as before
             for issue_type, line_number in scan_lines(lines):
-                issues.append(DataLeakageIssue(
-                    file_path=str(py_file),
-                    line_number=line_number,
-                    issue_type=issue_type,
-                    severity="low",  # Flag for review
-                ))
+                issues.append(
+                    DataLeakageIssue(
+                        file_path=str(py_file),
+                        line_number=line_number,
+                        issue_type=issue_type,
+                        severity="low",  # Flag for review
+                    )
+                )
 
         print(f"  ✓ Scanned {len(py_files)} scripts, found {len(issues)} potential leakage flags")
         return issues
@@ -303,7 +318,7 @@ class DataValidator:
 
         for py_file in py_files[:30]:  # Sample
             try:
-                with open(py_file, 'r') as f:
+                with open(py_file, "r") as f:
                     content = f.read()
 
                 used_sources = []
@@ -331,9 +346,7 @@ class DataValidator:
         total_symbols = sum(s.symbols_count for s in sources)
         avg_quality = np.mean([s.data_quality_score for s in sources])
 
-        summary = self._generate_summary(
-            sources, cross_issues, leakage_issues, repo_mapping
-        )
+        summary = self._generate_summary(sources, cross_issues, leakage_issues, repo_mapping)
 
         return ValidationReport(
             generated_at=datetime.now().isoformat(),
@@ -379,7 +392,7 @@ class DataValidator:
     @staticmethod
     def _extract_symbols(df: pd.DataFrame) -> set:
         """Extract unique symbols from DataFrame."""
-        for col in ['symbol', 'Symbol', 'ticker', 'Ticker', 'SYMBOL']:
+        for col in ["symbol", "Symbol", "ticker", "Ticker", "SYMBOL"]:
             if col in df.columns:
                 return set(df[col].unique())
         return set()
@@ -387,7 +400,7 @@ class DataValidator:
     @staticmethod
     def _extract_date_range(df: pd.DataFrame) -> Tuple[str, str]:
         """Extract date range from DataFrame."""
-        for col in ['date', 'Date', 'datetime', 'Datetime', 'DATE']:
+        for col in ["date", "Date", "datetime", "Datetime", "DATE"]:
             if col in df.columns:
                 try:
                     dates = pd.to_datetime(df[col])

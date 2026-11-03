@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 @dataclass
 class DataSourceMetadata:
     """Metadata for a single data source."""
+
     source_name: str
     source_type: str  # "parquet", "csv", "api", "kaggle"
     path: str
@@ -26,6 +27,7 @@ class DataSourceMetadata:
 @dataclass
 class CrossSourceIssue:
     """Issue found when comparing across sources."""
+
     symbol: str
     date: str
     source_1: str
@@ -39,6 +41,7 @@ class CrossSourceIssue:
 @dataclass
 class DataLeakageIssue:
     """Data leakage issue in backtest/analysis."""
+
     file_path: str
     line_number: int
     issue_type: str  # "future_data", "test_in_train", "unfair_split"
@@ -50,6 +53,7 @@ class DataLeakageIssue:
 @dataclass
 class ValidationReport:
     """Complete validation report."""
+
     generated_at: str
     total_sources: int
     total_records: int
@@ -71,15 +75,15 @@ class ValidationReport:
 
     def save_report(self, path: str):
         """Save report to JSON."""
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(self.to_dict(), f, indent=2, default=str)
         print(f"Report saved to {path}")
 
     def print_summary(self):
         """Print human-readable summary."""
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("DATA VALIDATION REPORT SUMMARY")
-        print("="*60)
+        print("=" * 60)
         print(f"Generated: {self.generated_at}")
         print(f"\nTotal Data Sources: {self.total_sources}")
         print(f"Total Records: {self.total_records:,}")
