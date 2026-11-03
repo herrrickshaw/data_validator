@@ -1,0 +1,66 @@
+{
+ "source": "screener.in",
+ "net_income": 100.0,
+ "net_income_prev": 80.0,
+ "profit_growth": 25.0,
+ "revenue": 1000.0,
+ "revenue_5y_ago": 500.0,
+ "eps_ttm": 5.0,
+ "eps_growth": 25.0,
+ "cfo": 120.0,
+ "ebit": 160.0,
+ "roe": 22.2,
+ "roe_history": [
+  22.2,
+  20.0,
+  NaN,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "roa": 13.3,
+ "roa_prev": 10.8,
+ "debt_to_equity": 0.44,
+ "debt_to_assets": 0.27,
+ "debt_to_assets_prev": 0.34,
+ "asset_turnover": 1.33,
+ "asset_turnover_prev": 1.22,
+ "shares": 10.0,
+ "shares_prev": 10.0,
+ "debt_history": [
+  200.0,
+  250.0,
+  NaN,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "capex_history": [
+  300.0,
+  280.0,
+  NaN,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "inventory": 40.0,
+ "receivables": 60.0,
+ "cash": 30.0,
+ "dividend_history": [
+  5.0,
+  0.0,
+  4.0,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "dividend_pay_years": 2,
+ "quarterly_net_income": [
+  100.0,
+  80.0,
+  60.0,
+  50.0,
+  NaN,
+  NaN
+ ]
+}

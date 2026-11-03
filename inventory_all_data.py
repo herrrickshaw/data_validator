@@ -4,6 +4,7 @@ Comprehensive Data Inventory & Deduplication Analysis
 Creates a complete list of all data, identifies duplicates, and proposes optimization
 """
 
+import logging
 import os
 import json
 import hashlib
@@ -12,6 +13,9 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 from typing import Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
+
 
 class DataInventoryAnalyzer:
     def __init__(self, repo_path: str):
@@ -30,7 +34,8 @@ class DataInventoryAnalyzer:
                 for chunk in iter(lambda: f.read(65536), b''):
                     sha256.update(chunk)
             return sha256.hexdigest()
-        except:
+        except Exception as exc:
+            logger.debug("ignored error: %s", exc)
             return None
 
     def scan_repository(self) -> Dict:

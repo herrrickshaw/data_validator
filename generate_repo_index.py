@@ -9,12 +9,16 @@ Generates:
 3. Branch metadata and dependencies
 """
 
+import logging
 import json
 import subprocess
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 import re
+
+logger = logging.getLogger(__name__)
+
 
 class RepositoryIndexGenerator:
     def __init__(self, repo_path: str):
@@ -139,7 +143,8 @@ class RepositoryIndexGenerator:
             branch_files = set(files)
             unique = list(branch_files - main_files)
             return unique[:5]  # Top 5
-        except:
+        except Exception as exc:
+            logger.debug("ignored error: %s", exc)
             return []
 
     def _analyze_file_types(self, files: list) -> dict:

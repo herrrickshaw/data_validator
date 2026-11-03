@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import io
+import logging
 import os
 import re
 import time
@@ -31,6 +32,7 @@ from typing import Optional
 import pandas as pd
 import requests
 
+logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 _UA = {"User-Agent": "Mozilla/5.0 (research)"}
 BASE = "https://www.screener.in"
@@ -165,117 +167,123 @@ def page_ratios(symbol: str) -> dict:
     return out
 
 
-def company_financials(symbol: str) -> dict:
-    """Parse the screener.in export + company-page ratios into a strategy-ready
-    fundamentals dict covering all 11 screeners (what each field can be derived
-    from; missing inputs simply make a given screener skip that stock)."""
-    raw = company_export_bytes(symbol)
-    if not raw:
-        return {}
+def _load_data_sheet(raw: bytes) -> Optional[pd.DataFrame]:
+    """Parse the export workbook's data sheet into a header-less frame; None if unreadable."""
     try:
         xl = pd.ExcelFile(io.BytesIO(raw))
         sheet = next((s for s in xl.sheet_names if "data" in s.lower()), xl.sheet_names[0])
-        df = pd.read_excel(io.BytesIO(raw), sheet_name=sheet, header=None)
-    except Exception:
-        return {}
+        return pd.read_excel(io.BytesIO(raw), sheet_name=sheet, header=None)
+    except Exception as exc:
+        logger.debug("unreadable screener.in export: %s", exc)
+        return None
 
-    def row(*labels):
-        for lab in labels:
-            m = df[
-                df.apply(
-                    lambda r: r.astype(str).str.strip().str.lower().eq(lab.lower()).any(), axis=1
-                )
-            ]
-            if not m.empty:
-                vals = [_num(v) for v in m.iloc[0].tolist()[1:] if _num(v) is not None]
-                if vals:
-                    return vals
-        return []
 
-    def g(lst, i=0):
-        return lst[i] if len(lst) > i else None
-
-    def pct(a, b):
-        return (a - b) / abs(b) * 100 if (a is not None and b not in (None, 0)) else None
-
-    ni = row("Net profit", "Net Profit")
-    rev = row("Sales", "Sales+", "Revenue", "Total Revenue")
-    interest = row("Interest")
-    pbt = row("Profit before tax", "Profit Before Tax")
-    eps = row("EPS in Rs", "Adjusted EPS in Rs", "EPS")
-    debt = row("Borrowings", "Borrowings+", "Total Debt")
-    reserves = row("Reserves")
-    capital = row("Equity Capital", "Equity Share Capital", "Share Capital")
-    other_liab = row("Other Liabilities", "Other Liabilities+")
-    net_block = row("Net Block", "Fixed Assets")
-    inv = row("Inventory", "Inventories")
-    recv = row("Trade receivables", "Debtors", "Receivables")
-    cash = row("Cash & Bank", "Cash Equivalents")
-    cfo = row("Cash from Operating Activity", "Cash from Operating Activity+")
-    shares = row("No. of Equity Shares", "No of Equity Shares")
-    div = row("Dividend Amount", "Dividend Paid", "Dividend Payout")
-
-    # equity, assets, derived ratios (statement-based)
-    eq = (
-        [
-            (capital[i] if i < len(capital) else 0) + (reserves[i] if i < len(reserves) else 0)
-            for i in range(max(len(capital), len(reserves)))
+def _sheet_row(df: pd.DataFrame, *labels: str) -> list:
+    """Numeric values (newest first, label column dropped) of the first row matching any label."""
+    for lab in labels:
+        m = df[
+            df.apply(lambda r: r.astype(str).str.strip().str.lower().eq(lab.lower()).any(), axis=1)
         ]
-        if (capital or reserves)
-        else []
-    )
-    assets_tot = (
-        [
-            (eq[i] if i < len(eq) else 0)
-            + (debt[i] if i < len(debt) else 0)
-            + (other_liab[i] if i < len(other_liab) else 0)
-            for i in range(max(len(eq), len(debt), len(other_liab)))
-        ]
-        if eq
-        else []
-    )
+        if not m.empty:
+            vals = [_num(v) for v in m.iloc[0].tolist()[1:] if _num(v) is not None]
+            if vals:
+                return vals
+    return []
+
+
+def _at(lst: list, i: int = 0):
+    """lst[i] or None when the series is too short."""
+    return lst[i] if len(lst) > i else None
+
+
+def _pct_change(a, b):
+    """Percent change from b to a; None when either is missing or b is zero."""
+    return (a - b) / abs(b) * 100 if (a is not None and b not in (None, 0)) else None
+
+
+# statement line -> candidate row labels in the export (first match wins)
+_STATEMENT_ROWS = {
+    "ni": ("Net profit", "Net Profit"),
+    "rev": ("Sales", "Sales+", "Revenue", "Total Revenue"),
+    "interest": ("Interest",),
+    "pbt": ("Profit before tax", "Profit Before Tax"),
+    "eps": ("EPS in Rs", "Adjusted EPS in Rs", "EPS"),
+    "debt": ("Borrowings", "Borrowings+", "Total Debt"),
+    "reserves": ("Reserves",),
+    "capital": ("Equity Capital", "Equity Share Capital", "Share Capital"),
+    "other_liab": ("Other Liabilities", "Other Liabilities+"),
+    "net_block": ("Net Block", "Fixed Assets"),
+    "inv": ("Inventory", "Inventories"),
+    "recv": ("Trade receivables", "Debtors", "Receivables"),
+    "cash": ("Cash & Bank", "Cash Equivalents"),
+    "cfo": ("Cash from Operating Activity", "Cash from Operating Activity+"),
+    "shares": ("No. of Equity Shares", "No of Equity Shares"),
+    "div": ("Dividend Amount", "Dividend Paid", "Dividend Payout"),
+}
+
+
+def _padded_sum(*series: list) -> list:
+    """Element-wise sum of series, treating missing tail values as 0."""
+    return [sum(x[i] if i < len(x) else 0 for x in series) for i in range(max(map(len, series)))]
+
+
+def _derive_balance(st: dict) -> tuple:
+    """(equity, total assets) series from capital + reserves (+ debt + other liabilities)."""
+    capital, reserves = st["capital"], st["reserves"]
+    eq = _padded_sum(capital, reserves) if (capital or reserves) else []
+    assets_tot = _padded_sum(eq, st["debt"], st["other_liab"]) if eq else []
+    return eq, assets_tot
+
+
+def _ratio(num, den, nd: int, scale: int = 1):
+    """round(num / den * scale, nd), or None when den is falsy."""
+    return round(num / den * scale, nd) if den else None
+
+
+def _fundamentals_from_statements(st: dict, r: dict) -> dict:
+    """Combine statement series `st` and page ratios `r` into the strategy fundamentals dict."""
+    g = _at
+    ni, rev, debt, cash, div = st["ni"], st["rev"], st["debt"], st["cash"], st["div"]
+    eq, assets_tot = _derive_balance(st)
     roe_hist = [round(ni[i] / eq[i] * 100, 1) for i in range(min(len(ni), len(eq))) if eq[i]]
+    pbt, interest = st["pbt"], st["interest"]
     ebit = (g(pbt) or 0) + (g(interest) or 0) if (pbt or interest) else None
-
-    r = page_ratios(symbol)
-    out = {
+    mcap = r.get("market_cap_cr")
+    ev = (mcap or 0) + (g(debt) or 0) - (g(cash) or 0)
+    return {
         "source": "screener.in",
         # profitability
         "net_income": g(ni),
         "net_income_prev": g(ni, 1),
-        "profit_growth": pct(g(ni), g(ni, 1)),
+        "profit_growth": _pct_change(g(ni), g(ni, 1)),
         "revenue": g(rev),
         "revenue_5y_ago": g(rev, 5) or (rev[-1] if rev else None),
-        "eps_ttm": g(eps),
-        "eps_growth": pct(g(eps), g(eps, 1)),
-        "cfo": g(cfo),
+        "eps_ttm": g(st["eps"]),
+        "eps_growth": _pct_change(g(st["eps"]), g(st["eps"], 1)),
+        "cfo": g(st["cfo"]),
         "ebit": ebit,
         # returns / leverage
-        "roe": r.get("roe_page") or (round(g(ni) / g(eq) * 100, 1) if g(eq) else None),
+        "roe": r.get("roe_page") or _ratio(g(ni), g(eq), 1, 100),
         "roce": r.get("roce_page"),
         "roc": r.get("roce_page"),
         "roe_history": roe_hist or None,
-        "roa": (round(g(ni) / g(assets_tot) * 100, 1) if g(assets_tot) else None),
-        "roa_prev": (round(g(ni, 1) / g(assets_tot, 1) * 100, 1) if g(assets_tot, 1) else None),
-        "debt_to_equity": (round(g(debt) / g(eq), 2) if g(eq) else None),
-        "debt_to_assets": (round(g(debt) / g(assets_tot), 2) if g(assets_tot) else None),
-        "debt_to_assets_prev": (
-            round(g(debt, 1) / g(assets_tot, 1), 2) if g(assets_tot, 1) else None
-        ),
-        "asset_turnover": (round(g(rev) / g(assets_tot), 2) if g(assets_tot) else None),
-        "asset_turnover_prev": (
-            round(g(rev, 1) / g(assets_tot, 1), 2) if g(assets_tot, 1) else None
-        ),
-        "shares": g(shares),
-        "shares_prev": g(shares, 1),
+        "roa": _ratio(g(ni), g(assets_tot), 1, 100),
+        "roa_prev": _ratio(g(ni, 1), g(assets_tot, 1), 1, 100),
+        "debt_to_equity": _ratio(g(debt), g(eq), 2),
+        "debt_to_assets": _ratio(g(debt), g(assets_tot), 2),
+        "debt_to_assets_prev": _ratio(g(debt, 1), g(assets_tot, 1), 2),
+        "asset_turnover": _ratio(g(rev), g(assets_tot), 2),
+        "asset_turnover_prev": _ratio(g(rev, 1), g(assets_tot, 1), 2),
+        "shares": g(st["shares"]),
+        "shares_prev": g(st["shares"], 1),
         "debt_history": debt or None,
-        "capex_history": net_block or None,
-        # working capital + CCC inputs (payables absent in export → CCC via the screen)
-        "inventory": g(inv),
-        "receivables": g(recv),
+        "capex_history": st["net_block"] or None,
+        # working capital + CCC inputs (payables absent in export -> CCC via the screen)
+        "inventory": g(st["inv"]),
+        "receivables": g(st["recv"]),
         "cash": g(cash),
         # income / valuation (page)
-        "market_cap_cr": r.get("market_cap_cr"),
+        "market_cap_cr": mcap,
         "current_price": r.get("current_price"),
         "pe": r.get("pe"),
         "book_value": r.get("book_value"),
@@ -283,19 +291,25 @@ def company_financials(symbol: str) -> dict:
         "dividend_history": div or None,
         "dividend_pay_years": sum(1 for x in (div or []) if x and x > 0) or None,
         # magic formula
-        "enterprise_value": (
-            ((r.get("market_cap_cr") or 0) + (g(debt) or 0) - (g(cash) or 0))
-            if r.get("market_cap_cr")
-            else None
-        ),
-        "earnings_yield": (
-            round(ebit / ((r.get("market_cap_cr") or 0) + (g(debt) or 0) - (g(cash) or 0)) * 100, 2)
-            if (ebit and r.get("market_cap_cr"))
-            else None
-        ),
+        "enterprise_value": ev if mcap else None,
+        "earnings_yield": round(ebit / ev * 100, 2) if (ebit and mcap) else None,
         # turnaround (annual NI as a coarse proxy; quarterly parse is a TODO)
         "quarterly_net_income": ni or None,
     }
+
+
+def company_financials(symbol: str) -> dict:
+    """Parse the screener.in export + company-page ratios into a strategy-ready
+    fundamentals dict covering all 11 screeners (what each field can be derived
+    from; missing inputs simply make a given screener skip that stock)."""
+    raw = company_export_bytes(symbol)
+    if not raw:
+        return {}
+    df = _load_data_sheet(raw)
+    if df is None:
+        return {}
+    statements = {key: _sheet_row(df, *labels) for key, labels in _STATEMENT_ROWS.items()}
+    out = _fundamentals_from_statements(statements, page_ratios(symbol))
     return {k: v for k, v in out.items() if v is not None}
 
 

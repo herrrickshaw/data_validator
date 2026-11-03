@@ -1,0 +1,21 @@
+{
+ "source": "screener.in",
+ "net_income": 20.0,
+ "net_income_prev": NaN,
+ "profit_growth": NaN,
+ "revenue": 500.0,
+ "revenue_5y_ago": 400.0,
+ "roe": 18.5,
+ "roce": 22.1,
+ "roc": 22.1,
+ "market_cap_cr": 5000,
+ "current_price": 250.0,
+ "pe": 20.0,
+ "book_value": 80.0,
+ "dividend_yield": 1.2,
+ "enterprise_value": 5000,
+ "quarterly_net_income": [
+  20.0,
+  NaN
+ ]
+}

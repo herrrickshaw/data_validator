@@ -8,11 +8,15 @@ Analyzes trends before diving into 1,825 days of daily price data.
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import logging
 from datetime import datetime, timedelta
 import warnings
 import json
 import pickle
 warnings.filterwarnings('ignore')
+
+
+logger = logging.getLogger(__name__)
 
 
 class QuarterlyDataCollector:
@@ -82,14 +86,16 @@ class QuarterlyDataCollector:
                                     metrics['revenue'] = qtr_is.loc['Total Revenue', qtr] if 'Total Revenue' in qtr_is.index else None
                                     metrics['operating_income'] = qtr_is.loc['Operating Income', qtr] if 'Operating Income' in qtr_is.index else None
                                     metrics['net_income'] = qtr_is.loc['Net Income', qtr] if 'Net Income' in qtr_is.index else None
-                                except:
+                                except Exception as exc:
+                                    logger.debug("ignored error: %s", exc)
                                     metrics['revenue'] = metrics['operating_income'] = metrics['net_income'] = None
 
                                 # Cash flow metrics
                                 try:
                                     metrics['ocf'] = qtr_cf.loc['Operating Cash Flow', qtr] if 'Operating Cash Flow' in qtr_cf.index else None
                                     metrics['capex'] = abs(qtr_cf.loc['Capital Expenditure', qtr]) if 'Capital Expenditure' in qtr_cf.index else None
-                                except:
+                                except Exception as exc:
+                                    logger.debug("ignored error: %s", exc)
                                     metrics['ocf'] = metrics['capex'] = None
 
                                 # Balance sheet metrics
@@ -97,12 +103,13 @@ class QuarterlyDataCollector:
                                     metrics['total_assets'] = qtr_bs.loc['Total Assets', qtr] if 'Total Assets' in qtr_bs.index else None
                                     metrics['total_debt'] = qtr_bs.loc['Total Debt', qtr] if 'Total Debt' in qtr_bs.index else None
                                     metrics['total_equity'] = qtr_bs.loc['Total Stockholder Equity', qtr] if 'Total Stockholder Equity' in qtr_bs.index else None
-                                except:
+                                except Exception as exc:
+                                    logger.debug("ignored error: %s", exc)
                                     metrics['total_assets'] = metrics['total_debt'] = metrics['total_equity'] = None
 
                                 quarterly_info.append(metrics)
-            except:
-                pass
+            except Exception as exc:
+                logger.debug("ignored error: %s", exc)
 
             if quarterly_info:
                 df = pd.DataFrame(quarterly_info)
@@ -165,8 +172,8 @@ class QuarterlyDataCollector:
             if len(ni_margin) >= 2:
                 metrics['ni_margin_trend'] = ni_margin.iloc[0] - ni_margin.iloc[-1]
 
-        except:
-            pass
+        except Exception as exc:
+            logger.debug("ignored error: %s", exc)
 
         return metrics
 

@@ -1,0 +1,12 @@
+{
+ "source": "screener.in",
+ "net_income": 20.0,
+ "net_income_prev": NaN,
+ "profit_growth": NaN,
+ "revenue": 500.0,
+ "revenue_5y_ago": 400.0,
+ "quarterly_net_income": [
+  20.0,
+  NaN
+ ]
+}
