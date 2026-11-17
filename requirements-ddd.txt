@@ -17,4 +17,4 @@ isort>=5.10.0
 aiofiles>=0.8.0
 
 # Logging
-python-json-logger>=2.0.0
+python-json-logger>=4.2.0
