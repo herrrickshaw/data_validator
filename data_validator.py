@@ -122,6 +122,8 @@ class DataValidator:
         self.cache_seed = self.base_path / "cache_seed"
         self.report = None
         self._loaded_data = {}  # Cache loaded DataFrames
+        self.cross_source_errors: List[Dict[str, Any]] = []  # comparisons that raised
+        self.kaggle_candidates: List[DataSourceMetadata] = []  # hardcoded, not inventoried
 
     def run_full_validation(self) -> ValidationReport:
         """Run complete validation pipeline."""
@@ -167,9 +169,12 @@ class DataValidator:
         print("  • Scanning CSV files...")
         sources.extend(self._scan_csv_files())
 
-        # Phase 1c: Kaggle metadata (if available)
-        print("  • Checking Kaggle datasets...")
-        sources.extend(self._scan_kaggle_datasets())
+        # Phase 1c: Kaggle. No Kaggle API call is made: _scan_kaggle_datasets() returns a
+        # hardcoded list of candidate dataset names. They are kept apart from the inventory
+        # so they do not count as sources (each would otherwise score quality 0).
+        self.kaggle_candidates = self._scan_kaggle_datasets()
+        print(f"  • {len(self.kaggle_candidates)} Kaggle dataset(s) listed as candidates "
+              f"(hardcoded names, not downloaded; not part of the inventory)")
 
         print(f"  ✓ Found {len(sources)} data sources")
         return sources
@@ -215,10 +220,16 @@ class DataValidator:
     def _scan_csv_files(self) -> List[DataSourceMetadata]:
         """Scan for CSV files in project."""
         sources = []
+        seen = set()
         # Search common data directories
         for pattern in ["**/*.csv", "data/**/*.csv", "**/results/**/*.csv"]:
             csv_files = list(self.base_path.glob(pattern))
             for cf in csv_files[:10]:  # Limit to avoid noise
+                # the patterns overlap (data/x.csv matches the first two): list a file once
+                key = cf.resolve()
+                if key in seen:
+                    continue
+                seen.add(key)
                 try:
                     df = pd.read_csv(cf, nrows=1000)  # Sample for metadata
                     metadata = DataSourceMetadata(
@@ -240,7 +251,10 @@ class DataValidator:
         return sources
 
     def _scan_kaggle_datasets(self) -> List[DataSourceMetadata]:
-        """Check for Kaggle datasets and metadata."""
+        """Return a hardcoded list of candidate Kaggle stock datasets.
+
+        This does not query the Kaggle API or check for local downloads; the entries
+        are placeholders marked 'Not yet downloaded'."""
         sources = []
         # Check if .kaggle/kaggle.json exists and list datasets
         kaggle_meta = Path.home() / ".kaggle"
@@ -302,8 +316,9 @@ class DataValidator:
                         errors.append(f"Column '{col}' should be numeric but is {df[col].dtype}")
 
             # Check 4: Price sanity (OHLC order)
-            if all(c in df.columns for c in ['open', 'high', 'low', 'close']):
-                invalid = (df['high'] < df['low']).sum()
+            lower = {c.lower(): c for c in df.columns}
+            if all(c in lower for c in ['open', 'high', 'low', 'close']):
+                invalid = (df[lower['high']] < df[lower['low']]).sum()
                 if invalid > 0:
                     errors.append(f"{invalid} rows with high < low (invalid OHLC)")
 
@@ -358,51 +373,50 @@ class DataValidator:
 
         print(f"  • Checking {len(common_symbols)} symbols across sources...")
 
-        for symbol, source_names in list(common_symbols.items())[:20]:  # Sample check
+        for symbol, source_names in common_symbols.items():  # every common symbol
             try:
                 dfs = []
                 for sname in source_names:
                     if sname in self._loaded_data:
                         df = self._loaded_data[sname].copy()
-                        if 'symbol' in df.columns or 'Symbol' in df.columns:
-                            sym_col = 'symbol' if 'symbol' in df.columns else 'Symbol'
+                        sym_col = self._symbol_column(df)
+                        if sym_col is not None:
                             df = df[df[sym_col] == symbol]
                         dfs.append((sname, df))
 
-                # Compare close prices
+                # Compare close prices on every common date
                 if len(dfs) >= 2 and all(len(df) > 0 for _, df in dfs):
                     for i, (sname1, df1) in enumerate(dfs[:-1]):
                         for sname2, df2 in dfs[i+1:]:
-                            # Merge on date and compare close
                             if 'close' in df1.columns and 'close' in df2.columns:
-                                common_dates = pd.to_datetime(
-                                    set(pd.to_datetime(df1['date'] if 'date' in df1.columns else df1.index)) &
-                                    set(pd.to_datetime(df2['date'] if 'date' in df2.columns else df2.index))
-                                )
-
-                                for date in list(common_dates)[:5]:  # Sample
-                                    val1 = df1[df1['date'] == date]['close'].values
-                                    val2 = df2[df2['date'] == date]['close'].values
-
-                                    if len(val1) > 0 and len(val2) > 0:
-                                        v1, v2 = float(val1[0]), float(val2[0])
-                                        if v1 > 0:
-                                            pct_diff = abs(v1 - v2) / v1
-                                            if pct_diff > 0.02:  # >2% difference
-                                                issues.append(CrossSourceIssue(
-                                                    symbol=symbol,
-                                                    date=str(date),
-                                                    source_1=sname1,
-                                                    source_2=sname2,
-                                                    field='close',
-                                                    value_1=v1,
-                                                    value_2=v2,
-                                                    discrepancy_pct=pct_diff
-                                                ))
+                                a = pd.DataFrame({'date': pd.to_datetime(df1['date']),
+                                                  'v1': pd.to_numeric(df1['close'])})
+                                b = pd.DataFrame({'date': pd.to_datetime(df2['date']),
+                                                  'v2': pd.to_numeric(df2['close'])})
+                                m = a.drop_duplicates('date').merge(
+                                    b.drop_duplicates('date'), on='date').sort_values('date')
+                                m = m[m['v1'] > 0]
+                                m['pct'] = (m['v1'] - m['v2']).abs() / m['v1']
+                                for row in m[m['pct'] > 0.02].itertuples(index=False):  # >2%
+                                    issues.append(CrossSourceIssue(
+                                        symbol=symbol,
+                                        date=str(row.date),
+                                        source_1=sname1,
+                                        source_2=sname2,
+                                        field='close',
+                                        value_1=float(row.v1),
+                                        value_2=float(row.v2),
+                                        discrepancy_pct=float(row.pct),
+                                    ))
             except Exception as e:
-                pass  # Continue on errors
+                # Do not let a failed comparison masquerade as "no discrepancy".
+                self.cross_source_errors.append(
+                    {"symbol": symbol, "sources": list(source_names), "error": repr(e)})
 
         print(f"  ✓ Found {len(issues)} cross-source inconsistencies")
+        if self.cross_source_errors:
+            print(f"  ⚠️  {len(self.cross_source_errors)} symbol comparison(s) could not be run "
+                  f"(see cross_source_errors); they are NOT counted as consistent")
         return issues
 
     def _detect_data_leakage(self) -> List[DataLeakageIssue]:
@@ -421,13 +435,13 @@ class DataValidator:
             ],
             "unfair_split": [
                 r"split.*random_state.*=.*None",  # Non-reproducible split
-                r"sample\(\).*frac",  # Random sampling without seed
+                r"\.sample\((?![^)]*random_state)[^)]*frac",  # Random sampling without seed
             ],
         }
 
         py_files = list(self.base_path.glob("**/*.py"))
 
-        for py_file in py_files[:50]:  # Sample analysis
+        for py_file in py_files:  # all of them: the summary reports len(py_files)
             try:
                 with open(py_file, 'r') as f:
                     content = f.read()
@@ -520,6 +534,7 @@ class DataValidator:
             "🔗 CROSS-SOURCE ISSUES:",
             f"  • Price discrepancies (>2%): {sum(1 for i in cross_issues if i.field == 'close')}",
             f"  • Date range mismatches: {sum(1 for i in cross_issues if i.field == 'date')}",
+            f"  • Comparisons that failed to run: {len(self.cross_source_errors)}",
             "",
             "⚠️  DATA LEAKAGE RISKS:",
             f"  • Future-looking operations: {sum(1 for i in leakage_issues if i.issue_type == 'future_data')}",
@@ -532,13 +547,17 @@ class DataValidator:
 
         return "\n".join(lines)
 
-    @staticmethod
-    def _extract_symbols(df: pd.DataFrame) -> set:
+    SYMBOL_COLUMNS = ('symbol', 'Symbol', 'ticker', 'Ticker', 'SYMBOL')
+
+    @classmethod
+    def _symbol_column(cls, df: pd.DataFrame) -> Optional[str]:
+        return next((c for c in cls.SYMBOL_COLUMNS if c in df.columns), None)
+
+    @classmethod
+    def _extract_symbols(cls, df: pd.DataFrame) -> set:
         """Extract unique symbols from DataFrame."""
-        for col in ['symbol', 'Symbol', 'ticker', 'Ticker', 'SYMBOL']:
-            if col in df.columns:
-                return set(df[col].unique())
-        return set()
+        col = cls._symbol_column(df)
+        return set(df[col].unique()) if col is not None else set()
 
     @staticmethod
     def _extract_date_range(df: pd.DataFrame) -> Tuple[str, str]:
