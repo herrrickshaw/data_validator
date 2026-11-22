@@ -16,17 +16,21 @@ Usage:
 """
 
 import ast
-import re
-from pathlib import Path
-from typing import Dict, List, Set, Tuple, Optional
-from dataclasses import dataclass, asdict, field
-from datetime import datetime
 import json
+import re
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 @dataclass
 class ScriptAnalysis:
     """Analysis of a single Python script."""
+
     file_path: str
     script_name: str
 
@@ -44,7 +48,7 @@ class ScriptAnalysis:
 
     # Testing approach
     is_exhaustive: bool = False  # Tests on all data
-    uses_samples: bool = False   # Tests on subset
+    uses_samples: bool = False  # Tests on subset
     sample_size: Optional[int] = None
 
     # Issues found
@@ -55,6 +59,7 @@ class ScriptAnalysis:
 @dataclass
 class RepositoryAnalysisReport:
     """Complete repository analysis."""
+
     generated_at: str
     total_scripts: int
     scripts_analyzed: List[ScriptAnalysis] = field(default_factory=list)
@@ -75,26 +80,26 @@ class RepositoryAnalysisReport:
     def save_report(self, path: str):
         """Save report as JSON."""
         data = asdict(self)
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
     def print_report(self):
         """Print human-readable report."""
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("REPOSITORY DATA USAGE ANALYSIS REPORT")
-        print("="*70)
+        print("=" * 70)
         print(f"Generated: {self.generated_at}")
-        print(f"\n📊 SUMMARY:")
+        print("\n📊 SUMMARY:")
         print(f"  Total scripts analyzed: {self.total_scripts}")
         print(f"  Scripts with issues: {self.scripts_with_issues}")
         print(f"  Missing train/val splits: {self.scripts_missing_train_val_split}")
         print(f"  Training on test data: {self.scripts_training_on_test}")
 
-        print(f"\n🔄 DATA TESTING APPROACH:")
+        print("\n🔄 DATA TESTING APPROACH:")
         for approach, count in self.exhaustive_vs_sample_breakdown.items():
             print(f"  {approach}: {count} scripts")
 
-        print(f"\n📋 SCRIPTS NEEDING ATTENTION:")
+        print("\n📋 SCRIPTS NEEDING ATTENTION:")
         for script in self.scripts_analyzed:
             if script.issues or script.trains_on_test_data:
                 print(f"\n  {script.script_name}")
@@ -105,7 +110,7 @@ class RepositoryAnalysisReport:
                     for warn in script.warnings:
                         print(f"    ⚠️  {warn}")
 
-        print(f"\n💡 RECOMMENDATIONS:")
+        print("\n💡 RECOMMENDATIONS:")
         for i, rec in enumerate(self.recommendations[:5], 1):
             print(f"  {i}. {rec}")
 
@@ -147,20 +152,14 @@ class RepositoryDataAnalyzer:
         """Find all Python scripts in repo."""
         scripts = list(self.base_path.glob("**/*.py"))
         # Filter out common non-analysis scripts
-        exclude_patterns = [
-            "__pycache__", ".git", ".pytest_cache",
-            "site-packages", "venv", "env"
-        ]
-        filtered = [
-            s for s in scripts
-            if not any(p in str(s) for p in exclude_patterns)
-        ]
+        exclude_patterns = ["__pycache__", ".git", ".pytest_cache", "site-packages", "venv", "env"]
+        filtered = [s for s in scripts if not any(p in str(s) for p in exclude_patterns)]
         return sorted(filtered)[:100]  # Limit for analysis
 
     def _analyze_script(self, script_path: Path) -> Optional[ScriptAnalysis]:
         """Analyze a single Python script."""
         try:
-            with open(script_path, 'r') as f:
+            with open(script_path, "r") as f:
                 content = f.read()
 
             analysis = ScriptAnalysis(
@@ -191,24 +190,24 @@ class RepositoryDataAnalyzer:
             if isinstance(node, ast.Call):
                 func_name = self._get_func_name(node.func)
 
-                if func_name in ['read_parquet', 'read_csv', 'read_excel']:
+                if func_name in ["read_parquet", "read_csv", "read_excel"]:
                     # Extract filename
                     if node.args:
                         filename = self._extract_string_arg(node.args[0])
                         if filename:
                             analysis.loaded_data_sources.append(filename)
 
-                elif func_name == 'train_test_split':
+                elif func_name == "train_test_split":
                     analysis.has_train_test_split = True
                     # Infer split method from kwargs
                     for keyword in node.keywords:
-                        if keyword.arg == 'test_size':
-                            analysis.split_method = 'random'
+                        if keyword.arg == "test_size":
+                            analysis.split_method = "random"
 
-                elif func_name in ['shuffle', 'sample']:
+                elif func_name in ["shuffle", "sample"]:
                     analysis.uses_samples = True
 
-                elif func_name in ['to_parquet', 'to_csv']:
+                elif func_name in ["to_parquet", "to_csv"]:
                     if node.args:
                         filename = self._extract_string_arg(node.args[0])
                         if filename:
@@ -233,7 +232,9 @@ class RepositoryDataAnalyzer:
         if re.search(r"\.head\(\d+\)|\.sample\(\)|nrows\s*=|limit\s*=", content):
             analysis.uses_samples = True
             # Try to extract sample size
-            match = re.search(r"\.head\((\d+)\)|\.sample\(.*n\s*=\s*(\d+)\)|nrows\s*=\s*(\d+)", content)
+            match = re.search(
+                r"\.head\((\d+)\)|\.sample\(.*n\s*=\s*(\d+)\)|nrows\s*=\s*(\d+)", content
+            )
             if match:
                 for g in match.groups():
                     if g:
@@ -266,7 +267,7 @@ class RepositoryDataAnalyzer:
         # Issue 1: No train/test split
         if not analysis.has_train_test_split and analysis.uses_all_data:
             analysis.issues.append(
-                f"Uses all data without train/test split (backtest/analysis on same data)"
+                "Uses all data without train/test split (backtest/analysis on same data)"
             )
 
         # Issue 2: Sample-based testing instead of exhaustive
@@ -279,8 +280,7 @@ class RepositoryDataAnalyzer:
         # Issue 3: Random split without seed
         if "test_size" in content and "random_state" not in content:
             analysis.warnings.append(
-                "Random train/test split without fixed random_state "
-                "(not reproducible)"
+                "Random train/test split without fixed random_state " "(not reproducible)"
             )
 
         # Issue 4: Date-based backtest without proper split
@@ -293,8 +293,7 @@ class RepositoryDataAnalyzer:
         # Issue 5: No data validation
         if "assert" not in content and "validate" not in content.lower():
             analysis.warnings.append(
-                "No data validation/assertions found; "
-                "add checks for data integrity"
+                "No data validation/assertions found; " "add checks for data integrity"
             )
 
         # Issue 6: Multiple data sources without consistency checks
@@ -330,9 +329,7 @@ class RepositoryDataAnalyzer:
                 source_to_users[source].append(analysis.script_name)
 
         # Generate recommendations
-        recommendations = self._generate_recommendations(
-            analyses, missing_splits, training_on_test
-        )
+        recommendations = self._generate_recommendations(analyses, missing_splits, training_on_test)
 
         report = RepositoryAnalysisReport(
             generated_at=datetime.now().isoformat(),
@@ -424,19 +421,19 @@ class RepositoryDataAnalyzer:
 # DATA SPLIT VALIDATOR
 # ============================================================================
 
+
 class DataSplitValidator:
     """Validate train/val/test splits."""
 
     @staticmethod
     def validate_chronological_split(
-        df: 'pd.DataFrame',
+        df: "pd.DataFrame",
         date_col: str,
         train_ratio: float = 0.6,
         val_ratio: float = 0.2,
         test_ratio: float = 0.2,
     ) -> Dict[str, Tuple[datetime, datetime]]:
         """Validate chronological train/val/test split."""
-        import pandas as pd
 
         df_sorted = df.sort_values(date_col)
         n = len(df_sorted)
@@ -445,18 +442,12 @@ class DataSplitValidator:
         val_end = int(n * (train_ratio + val_ratio))
 
         splits = {
-            "train": (
-                df_sorted.iloc[0][date_col],
-                df_sorted.iloc[train_end-1][date_col]
-            ),
+            "train": (df_sorted.iloc[0][date_col], df_sorted.iloc[train_end - 1][date_col]),
             "validation": (
                 df_sorted.iloc[train_end][date_col],
-                df_sorted.iloc[val_end-1][date_col]
+                df_sorted.iloc[val_end - 1][date_col],
             ),
-            "test": (
-                df_sorted.iloc[val_end][date_col],
-                df_sorted.iloc[-1][date_col]
-            ),
+            "test": (df_sorted.iloc[val_end][date_col], df_sorted.iloc[-1][date_col]),
         }
 
         return splits

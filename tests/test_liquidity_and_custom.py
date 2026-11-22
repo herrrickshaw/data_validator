@@ -1,11 +1,10 @@
 """liquidity tiers + custom_screener metrics/evaluation."""
 
+import custom_screener as cs
+import liquidity as liq
 import numpy as np
 import pandas as pd
 import pytest
-
-import custom_screener as cs
-import liquidity as liq
 from strategies.base import StockData
 
 

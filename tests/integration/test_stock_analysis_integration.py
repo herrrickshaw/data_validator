@@ -3,20 +3,19 @@ Integration tests: Stock Analysis context with Market Data context
 Verify ACL translation and screening orchestration
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from src.market_data.domain.models import (
-    Ticker, Price, OHLC, MarketData, MarketCalendar
-)
+import pytest
+
+from src.market_data.domain.models import OHLC, MarketData, Price, Ticker
 from src.market_data.domain.repositories import MarketDataRepositoryMemory
-from src.stock_analysis.domain.models import Criterion, Screen, Stock
+from src.shared.domain.events import ScreeningCompleted
+from src.shared.infrastructure.event_bus import EventBus
+from src.stock_analysis.application.screening_service import ScreeningService
+from src.stock_analysis.domain.models import Criterion, Screen
 from src.stock_analysis.domain.repositories import StockRepositoryMemory
 from src.stock_analysis.infrastructure.market_data_acl import MarketDataACL
-from src.stock_analysis.application.screening_service import ScreeningService
-from src.shared.infrastructure.event_bus import EventBus
-from src.shared.domain.events import ScreeningCompleted, StockScored
 
 
 @pytest.fixture
@@ -50,7 +49,7 @@ class TestACLTranslation:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
         market_data.add_metric("PE", Decimal("25.0"))
@@ -74,7 +73,7 @@ class TestACLTranslation:
             high_price=Price(Decimal("3650.00"), "INR"),
             low_price=Price(Decimal("3580.00"), "INR"),
             close_price=Price(Decimal("3620.00"), "INR"),
-            volume=500000
+            volume=500000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
 
@@ -95,7 +94,7 @@ class TestACLTranslation:
             high_price=Price(Decimal("2550.00"), "INR"),
             low_price=Price(Decimal("2480.00"), "INR"),
             close_price=Price(Decimal("2520.00"), "INR"),
-            volume=300000
+            volume=300000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
 
@@ -125,7 +124,7 @@ class TestScreeningService:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data1 = MarketData(ticker=ticker1, date=datetime.now(), ohlc=ohlc1)
         market_data1.add_metric("PE", Decimal("25.0"))
@@ -137,7 +136,7 @@ class TestScreeningService:
             high_price=Price(Decimal("3650.00"), "INR"),
             low_price=Price(Decimal("3580.00"), "INR"),
             close_price=Price(Decimal("3620.00"), "INR"),
-            volume=500000
+            volume=500000,
         )
         market_data2 = MarketData(ticker=ticker2, date=datetime.now(), ohlc=ohlc2)
         market_data2.add_metric("PE", Decimal("30.0"))
@@ -160,7 +159,7 @@ class TestScreeningService:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data1 = MarketData(ticker=ticker1, date=datetime.now(), ohlc=ohlc1)
         market_data1.add_metric("PE", Decimal("25.0"))
@@ -172,7 +171,7 @@ class TestScreeningService:
             high_price=Price(Decimal("3650.00"), "INR"),
             low_price=Price(Decimal("3580.00"), "INR"),
             close_price=Price(Decimal("3620.00"), "INR"),
-            volume=500000
+            volume=500000,
         )
         market_data2 = MarketData(ticker=ticker2, date=datetime.now(), ohlc=ohlc2)
         market_data2.add_metric("PE", Decimal("28.0"))
@@ -180,11 +179,7 @@ class TestScreeningService:
 
         # Screen: PE < 30
         criterion = Criterion(metric_name="PE", operator="<", threshold=Decimal("30"))
-        screen = Screen(
-            name="Low PE",
-            description="PE < 30",
-            criteria=[criterion]
-        )
+        screen = Screen(name="Low PE", description="PE < 30", criteria=[criterion])
 
         # Run screening
         result = screening_service.run_screen(screen)
@@ -203,7 +198,7 @@ class TestScreeningService:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data1 = MarketData(ticker=ticker1, date=datetime.now(), ohlc=ohlc1)
         market_data1.add_metric("PE", Decimal("25.0"))
@@ -215,7 +210,7 @@ class TestScreeningService:
             high_price=Price(Decimal("3650.00"), "INR"),
             low_price=Price(Decimal("3580.00"), "INR"),
             close_price=Price(Decimal("3620.00"), "INR"),
-            volume=500000
+            volume=500000,
         )
         market_data2 = MarketData(ticker=ticker2, date=datetime.now(), ohlc=ohlc2)
         market_data2.add_metric("PE", Decimal("35.0"))
@@ -223,11 +218,7 @@ class TestScreeningService:
 
         # Screen: PE < 30
         criterion = Criterion(metric_name="PE", operator="<", threshold=Decimal("30"))
-        screen = Screen(
-            name="Low PE",
-            description="PE < 30",
-            criteria=[criterion]
-        )
+        screen = Screen(name="Low PE", description="PE < 30", criteria=[criterion])
 
         result = screening_service.run_screen(screen)
 
@@ -244,18 +235,14 @@ class TestScreeningService:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
         market_data.add_metric("PE", Decimal("25.0"))
         market_data_repo.save(market_data)
 
         criterion = Criterion(metric_name="PE", operator="<", threshold=Decimal("30"))
-        screen = Screen(
-            name="Low PE",
-            description="PE < 30",
-            criteria=[criterion]
-        )
+        screen = Screen(name="Low PE", description="PE < 30", criteria=[criterion])
 
         screening_service.run_screen(screen)
 
@@ -276,18 +263,14 @@ class TestScreeningService:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
         market_data.add_metric("PE", Decimal("25.0"))
         market_data_repo.save(market_data)
 
         criterion = Criterion(metric_name="PE", operator="<", threshold=Decimal("30"))
-        screen = Screen(
-            name="Low PE",
-            description="PE < 30",
-            criteria=[criterion]
-        )
+        screen = Screen(name="Low PE", description="PE < 30", criteria=[criterion])
 
         screening_service.run_screen(screen)
 
@@ -305,7 +288,7 @@ class TestScreeningService:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
         market_data.add_metric("PE", Decimal("25.0"))
@@ -315,13 +298,9 @@ class TestScreeningService:
         # Screen: PE < 30 AND ROE > 15
         criteria = [
             Criterion(metric_name="PE", operator="<", threshold=Decimal("30")),
-            Criterion(metric_name="ROE", operator=">", threshold=Decimal("15"))
+            Criterion(metric_name="ROE", operator=">", threshold=Decimal("15")),
         ]
-        screen = Screen(
-            name="Quality Growth",
-            description="Low PE and High ROE",
-            criteria=criteria
-        )
+        screen = Screen(name="Quality Growth", description="Low PE and High ROE", criteria=criteria)
 
         result = screening_service.run_screen(screen)
 
@@ -343,7 +322,7 @@ class TestContextBoundary:
             high_price=Price(Decimal("1550.00"), "INR"),
             low_price=Price(Decimal("1480.00"), "INR"),
             close_price=Price(Decimal("1520.00"), "INR"),
-            volume=1000000
+            volume=1000000,
         )
         market_data = MarketData(ticker=ticker, date=datetime.now(), ohlc=ohlc)
         market_data_repo.save(market_data)

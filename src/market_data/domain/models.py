@@ -17,6 +17,7 @@ class Ticker(ValueObject):
     Value Object: Stock ticker symbol
     Immutable, identified by symbol and exchange
     """
+
     symbol: str
     exchange: str  # NSE, BSE, NASDAQ, NYSE
 
@@ -36,6 +37,7 @@ class Price(ValueObject):
     Value Object: A price with currency
     Immutable, always positive
     """
+
     value: Decimal
     currency: str = "INR"
 
@@ -72,6 +74,7 @@ class OHLC(ValueObject):
     """
     Value Object: Open, High, Low, Close prices for a day
     """
+
     open_price: Decimal
     high_price: Decimal
     low_price: Decimal
@@ -92,6 +95,7 @@ class Metric(ValueObject):
     """
     Value Object: A financial metric with value and timestamp
     """
+
     name: str  # PE, ROE, DebtToEquity, etc.
     value: Decimal
     as_of_date: datetime
@@ -168,6 +172,7 @@ class MarketCalendar:
     def next_trading_day(self, date: datetime) -> datetime:
         """Find next trading day"""
         from datetime import timedelta
+
         current = date + timedelta(days=1)
         while not self.is_trading_day(current):
             current += timedelta(days=1)
@@ -176,6 +181,7 @@ class MarketCalendar:
     def previous_trading_day(self, date: datetime) -> datetime:
         """Find previous trading day"""
         from datetime import timedelta
+
         current = date - timedelta(days=1)
         while not self.is_trading_day(current):
             current -= timedelta(days=1)

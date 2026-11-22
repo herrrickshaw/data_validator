@@ -7,10 +7,10 @@ If Market Data format changes, ONLY this file changes.
 """
 
 from decimal import Decimal
-from typing import Dict, Any
+from typing import Dict
 
+from src.market_data.domain.models import MarketData, Price
 from src.stock_analysis.domain.models import Stock
-from src.market_data.domain.models import MarketData, Ticker, Price
 
 
 class MarketDataACL:
@@ -34,16 +34,29 @@ class MarketDataACL:
         - market_data.metrics → domain-ready format
         """
         # Create stock aggregate
-        stock = Stock(
-            ticker=market_data.ticker.symbol,
-            exchange=market_data.ticker.exchange
-        )
+        stock = Stock(ticker=market_data.ticker.symbol, exchange=market_data.ticker.exchange)
 
         # Add OHLC data as metrics (extract value from Price objects)
-        open_val = market_data.ohlc.open_price.value if isinstance(market_data.ohlc.open_price, Price) else market_data.ohlc.open_price
-        high_val = market_data.ohlc.high_price.value if isinstance(market_data.ohlc.high_price, Price) else market_data.ohlc.high_price
-        low_val = market_data.ohlc.low_price.value if isinstance(market_data.ohlc.low_price, Price) else market_data.ohlc.low_price
-        close_val = market_data.ohlc.close_price.value if isinstance(market_data.ohlc.close_price, Price) else market_data.ohlc.close_price
+        open_val = (
+            market_data.ohlc.open_price.value
+            if isinstance(market_data.ohlc.open_price, Price)
+            else market_data.ohlc.open_price
+        )
+        high_val = (
+            market_data.ohlc.high_price.value
+            if isinstance(market_data.ohlc.high_price, Price)
+            else market_data.ohlc.high_price
+        )
+        low_val = (
+            market_data.ohlc.low_price.value
+            if isinstance(market_data.ohlc.low_price, Price)
+            else market_data.ohlc.low_price
+        )
+        close_val = (
+            market_data.ohlc.close_price.value
+            if isinstance(market_data.ohlc.close_price, Price)
+            else market_data.ohlc.close_price
+        )
 
         stock.add_metric("Open", open_val)
         stock.add_metric("High", high_val)

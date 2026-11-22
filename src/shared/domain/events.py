@@ -5,7 +5,8 @@ Published by multiple bounded contexts
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from .base import DomainEvent
 
 
@@ -15,6 +16,7 @@ class MarketDataFetched(DomainEvent):
     Published by: Market Data Provider Context
     Subscribed to by: Stock Analysis, Portfolio, Backtesting
     """
+
     ticker: str
     exchange: str
     date: datetime
@@ -28,6 +30,7 @@ class MarketDataFetched(DomainEvent):
 @dataclass
 class DataValidationFailed(DomainEvent):
     """Published by: Market Data Provider Context"""
+
     ticker: str
     date: datetime
     reason: str
@@ -42,6 +45,7 @@ class ScreeningCompleted(DomainEvent):
     Published by: Stock Analysis Context
     Subscribed to by: Portfolio, Backtesting, Reporting, Risk & Signals
     """
+
     screen_name: str
     stocks_matched: List[str]
     total_evaluated: int
@@ -54,6 +58,7 @@ class ScreeningCompleted(DomainEvent):
 @dataclass
 class StockScored(DomainEvent):
     """Published by: Stock Analysis Context"""
+
     ticker: str
     screen_name: str
     score: float
@@ -71,6 +76,7 @@ class PortfolioRebalanced(DomainEvent):
     Published by: Portfolio Strategy Context
     Subscribed to by: Reporting, Risk & Signals, Backtesting
     """
+
     portfolio_name: str
     old_allocation: Dict[str, float]
     new_allocation: Dict[str, float]
@@ -83,6 +89,7 @@ class PortfolioRebalanced(DomainEvent):
 @dataclass
 class AllocationChanged(DomainEvent):
     """Published by: Portfolio Strategy Context"""
+
     portfolio_name: str
     ticker: str
     old_weight: float
@@ -98,6 +105,7 @@ class BacktestCompleted(DomainEvent):
     Published by: Backtesting Context
     Subscribed to by: Reporting, Risk & Signals
     """
+
     portfolio_name: str
     start_date: datetime
     end_date: datetime
@@ -113,6 +121,7 @@ class BacktestCompleted(DomainEvent):
 @dataclass
 class PerformanceReport(DomainEvent):
     """Published by: Backtesting Context"""
+
     portfolio_name: str
     metrics: Dict[str, Any]
 
@@ -126,6 +135,7 @@ class RiskThresholdExceeded(DomainEvent):
     Published by: Risk & Signals Context
     Subscribed to by: Reporting
     """
+
     portfolio_name: str
     metric_name: str
     threshold: float
@@ -142,6 +152,7 @@ class BuySignalGenerated(DomainEvent):
     Published by: Risk & Signals Context
     Subscribed to by: Reporting
     """
+
     ticker: str
     confidence: float
     reason: str
@@ -154,6 +165,7 @@ class BuySignalGenerated(DomainEvent):
 @dataclass
 class SellSignalGenerated(DomainEvent):
     """Published by: Risk & Signals Context"""
+
     ticker: str
     confidence: float
     reason: str
@@ -166,6 +178,7 @@ class SellSignalGenerated(DomainEvent):
 @dataclass
 class ReportGenerated(DomainEvent):
     """Published by: Reporting Context"""
+
     report_type: str  # daily, weekly, monthly
     generated_at: datetime
     content_summary: str
@@ -177,6 +190,7 @@ class ReportGenerated(DomainEvent):
 @dataclass
 class NotificationSent(DomainEvent):
     """Published by: Reporting Context"""
+
     recipient: str
     notification_type: str
     subject: str

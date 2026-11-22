@@ -3,9 +3,8 @@ Shared Domain Base Classes
 Foundation for all bounded contexts
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, List
 from uuid import uuid4
 
@@ -85,4 +84,5 @@ class ApplicationService(ABC):
 
 class DomainException(Exception):
     """Base domain exception"""
+
     pass
