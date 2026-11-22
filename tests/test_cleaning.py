@@ -2,7 +2,6 @@
 
 import numpy as np
 import pandas as pd
-
 from stock_utils import cagr, clean_ohlcv, normalise_debt_to_equity, pct_change
 
 

@@ -6,13 +6,14 @@ Core domain for stock screening and evaluation
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Dict
+from typing import Dict, List
 
-from src.shared.domain.base import ValueObject, AggregateRoot, DomainException
+from src.shared.domain.base import AggregateRoot, DomainException, ValueObject
 
 
 class ScreeningException(DomainException):
     """Raised when screening operation is invalid"""
+
     pass
 
 
@@ -22,6 +23,7 @@ class Criterion(ValueObject):
     Value Object: A single screening criterion
     Immutable rule for evaluating stocks
     """
+
     metric_name: str  # "PE", "ROE", "DebtToEquity"
     operator: str  # "<", ">", "=="
     threshold: Decimal
@@ -59,6 +61,7 @@ class Screen(ValueObject):
     Value Object: Immutable set of screening criteria
     Defines a specific investment screening strategy (e.g., Coffee Can)
     """
+
     name: str
     description: str
     criteria: List[Criterion] = field(default_factory=list)
@@ -130,7 +133,7 @@ class Stock(AggregateRoot):
         self.screening_results[screen.name] = {
             "passed": passed,
             "timestamp": datetime.now(),
-            "details": details or {}
+            "details": details or {},
         }
         self.updated_at = datetime.now()
 
@@ -168,7 +171,14 @@ class StockScore:
     Used to rank stocks after screening
     """
 
-    def __init__(self, stock_ticker: str, screen_name: str, score: float, criteria_met: int, total_criteria: int):
+    def __init__(
+        self,
+        stock_ticker: str,
+        screen_name: str,
+        score: float,
+        criteria_met: int,
+        total_criteria: int,
+    ):
         self.stock_ticker = stock_ticker
         self.screen_name = screen_name
         self.score = score  # 0-100 percentage

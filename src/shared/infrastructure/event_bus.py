@@ -3,12 +3,11 @@ Event Bus - Enables communication between bounded contexts
 Simple in-process implementation (production would use message broker)
 """
 
-from typing import Callable, List, Type, Dict
-from collections import defaultdict
 import logging
+from collections import defaultdict
+from typing import Callable, Dict, List, Type
 
 from src.shared.domain.base import DomainEvent
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +64,7 @@ class EventBus:
                 logger.debug(f"Calling handler: {handler.__name__}")
                 handler(event)
             except Exception as e:
-                logger.error(
-                    f"Error in event handler {handler.__name__}: {str(e)}",
-                    exc_info=True
-                )
+                logger.error(f"Error in event handler {handler.__name__}: {str(e)}", exc_info=True)
                 # Continue with other handlers even if one fails
                 # For critical errors, implement dead-letter queue in production
 

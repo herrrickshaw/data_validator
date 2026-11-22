@@ -4,10 +4,11 @@ Abstracts persistence details from domain logic
 """
 
 from abc import abstractmethod
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
 from src.shared.domain.base import Repository
+
 from .models import MarketData, Ticker
 
 
@@ -23,9 +24,7 @@ class MarketDataRepository(Repository):
         pass
 
     @abstractmethod
-    def find_by_ticker_and_date(
-        self, ticker: Ticker, date: datetime
-    ) -> Optional[MarketData]:
+    def find_by_ticker_and_date(self, ticker: Ticker, date: datetime) -> Optional[MarketData]:
         """Retrieve market data for a specific ticker and date"""
         pass
 
@@ -55,18 +54,12 @@ class MarketDataRepositoryMemory(MarketDataRepository):
         key = (market_data.ticker.symbol, market_data.date.date())
         self.data[key] = market_data
 
-    def find_by_ticker_and_date(
-        self, ticker: Ticker, date: datetime
-    ) -> Optional[MarketData]:
+    def find_by_ticker_and_date(self, ticker: Ticker, date: datetime) -> Optional[MarketData]:
         key = (ticker.symbol, date.date())
         return self.data.get(key)
 
     def find_by_ticker(self, ticker: Ticker, days: int = 252) -> List[MarketData]:
-        results = [
-            data
-            for (symbol, _), data in self.data.items()
-            if symbol == ticker.symbol
-        ]
+        results = [data for (symbol, _), data in self.data.items() if symbol == ticker.symbol]
         return sorted(results, key=lambda x: x.date, reverse=True)[:days]
 
     def find_all(self) -> List[MarketData]:

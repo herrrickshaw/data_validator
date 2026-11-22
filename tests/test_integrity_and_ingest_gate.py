@@ -17,9 +17,13 @@ def repo(tmp_path, monkeypatch):
     tracked = sorted(files)
     monkeypatch.setattr(integrity, "HERE", tmp_path)
     monkeypatch.setattr(integrity, "MANIFEST", tmp_path / "cache_seed" / "CHECKSUMS.sha256")
-    monkeypatch.setattr(integrity, "_tracked_files",
-                        lambda data_only=False: [f for f in tracked
-                                                 if not data_only or f.startswith(integrity.DATA_PREFIXES)])
+    monkeypatch.setattr(
+        integrity,
+        "_tracked_files",
+        lambda data_only=False: [
+            f for f in tracked if not data_only or f.startswith(integrity.DATA_PREFIXES)
+        ],
+    )
     return tmp_path, tracked
 
 
@@ -62,6 +66,7 @@ def test_data_only_ignores_code_files(repo):
 
 # ---- ingest_gate --------------------------------------------------------------------------
 
+
 def test_dedup_keeps_last_symbol_date():
     df = pd.DataFrame({"Symbol": ["A", "A", "B"], "Date": ["d1", "d1", "d1"], "Close": [1, 2, 3]})
     clean, dropped = ig.dedup(df)
@@ -79,7 +84,7 @@ def test_enforce_dtypes_compacts_and_coerces():
     out = ig.enforce_dtypes(df)
     assert str(out["Open"].dtype) == "float32" and pd.isna(out["Open"][1])
     assert str(out["Volume"].dtype) == "int32" and out["Volume"].tolist() == [10, 0]
-    assert df["Open"].tolist() == ["1.5", "bad"]       # input not mutated
+    assert df["Open"].tolist() == ["1.5", "bad"]  # input not mutated
 
 
 def test_enforce_dtypes_large_volume_stays_int64():
