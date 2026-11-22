@@ -37,7 +37,7 @@ def test_trading_days_filter_and_next():
     assert nxt == _dt.date(2025, 12, 26)
 
 
-def test_auto_screener_rule_application():
+def test_auto_screener_rule_application(monkeypatch):
     import auto_screener as a
 
     df = pd.DataFrame(
@@ -53,13 +53,13 @@ def test_auto_screener_rule_application():
         }
     )
     # monkeypatch the serving read to our frame
-    a.sl.serving = lambda m: df  # type: ignore
+    monkeypatch.setattr(a.sl, "serving", lambda m: df)  # undone after the test
     rule = {"RSI14": [(">=", 50)], "Above200DMA": [("==", True)]}
     out = a.apply_rule(rule, "IN")
     assert set(out["Symbol"]) == {"A", "C"}  # B fails RSI + trend + illiquid
 
 
-def test_auto_screener_reward_penalises_deviation():
+def test_auto_screener_reward_penalises_deviation(monkeypatch):
     import auto_screener as a
 
     df = pd.DataFrame(
@@ -74,7 +74,7 @@ def test_auto_screener_reward_penalises_deviation():
             "Liquidity": ["High"] * 10,
         }
     )
-    a.sl.serving = lambda m: df  # type: ignore
+    monkeypatch.setattr(a.sl, "serving", lambda m: df)  # undone after the test
     good = {f"S{i}" for i in range(10)}
     rule = {"RSI14": [(">=", 50)]}
     ev = a.evaluate(rule, "IN", good)
