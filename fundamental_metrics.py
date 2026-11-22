@@ -303,6 +303,15 @@ FUND_SCREENS: Dict[str, Callable[[pd.DataFrame], pd.Series]] = {
 }
 
 
+def _screen_mask(name: str, df: pd.DataFrame) -> pd.Series:
+    """Boolean mask for screen `name`, aligned to df.index.
+
+    A screen whose input column is absent (e.g. eps_growth for yfinance-sourced markets) evaluates
+    to an empty Series; reindexing makes that "no matches" instead of an unalignable indexer.
+    """
+    return FUND_SCREENS[name](df).reindex(df.index, fill_value=False).fillna(False).astype(bool)
+
+
 def run_all(market: str, limit: int = 40, verbose: bool = True) -> Dict[str, int]:
     df = load_fundamentals(market, limit=limit, verbose=verbose)
     if df.empty:
@@ -313,9 +322,9 @@ def run_all(market: str, limit: int = 40, verbose: bool = True) -> Dict[str, int
     counts = {}
     if verbose:
         print(f"\n=== fundamental screens on {market} ({len(df)} names with financials) ===")
-    for name, pred in FUND_SCREENS.items():
+    for name in FUND_SCREENS:
         try:
-            m = pred(df).fillna(False)
+            m = _screen_mask(name, df)
         except Exception:
             m = pd.Series(False, index=df.index)
         counts[name] = int(m.sum())
@@ -329,7 +338,7 @@ def run_screen(name: str, market: str, limit: int = 40, top: Optional[int] = 25)
     df = _enrich(load_fundamentals(market, limit=limit))
     if df.empty or name not in FUND_SCREENS:
         return pd.DataFrame()
-    out = df[FUND_SCREENS[name](df).fillna(False)]
+    out = df[_screen_mask(name, df)]
     sort = "roce" if name in ("high_roce", "magic_formula") else "piotroski"
     if sort in out.columns:
         out = out.sort_values(sort, ascending=False)

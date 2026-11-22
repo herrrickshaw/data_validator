@@ -150,7 +150,7 @@ def capture_deltas(market: str, verbose: bool = True) -> int:
         # last known close per symbol from the log
         prev_close = prev.sort_values("ts").groupby("key")["value"].last().to_dict()
 
-    ts = pd.Timestamp.utcnow().isoformat()
+    ts = pd.Timestamp.now("UTC").isoformat()
     deltas = []
     for sym, row in cur.iterrows():
         c = float(row["Close"])
